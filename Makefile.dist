@@ -22,7 +22,7 @@
 #   http://www.isc.org/
 
 
-SUBDIRS=	common $(MINIRES) dst omapip server client relay dhcpctl
+SUBDIRS=	common $(MINIRES) dst omapip server client relay dhcpctl dug
 
 all:
 	@for dir in ${SUBDIRS}; do \

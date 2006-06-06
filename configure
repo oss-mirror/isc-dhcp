@@ -246,7 +246,7 @@ if [ ! -d $workname ]; then
 fi
 
 if [ x"$dirs" = x ]; then
-  dirs=". client server relay common omapip dhcpctl minires dst"
+  dirs=". client server relay common omapip dhcpctl minires dst dug"
 fi
 
 for foo in $dirs; do
