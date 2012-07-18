@@ -1418,6 +1418,12 @@ void dhcp (packet)
 
 #ifdef DHCPv6
 void
+dhcp_tsv(struct packet *packet)
+{
+	return;
+}
+
+void
 dhcpv6(struct packet *packet) {
 	struct iaddrmatchlist *ap;
 	struct client_state *client;

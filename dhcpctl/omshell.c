@@ -60,6 +60,7 @@ void bootp (struct packet *packet) { }
 
 #ifdef DHCPv6
 /* XXX: should we warn or something here? */
+void dhcp_tsv(struct packet *packet) { }
 void dhcpv6(struct packet *packet) { }
 #endif /* DHCPv6 */
 

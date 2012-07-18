@@ -2,3 +2,7 @@
 Makefile
 dhcrelay
 dhcrelay.man8
+dhccra
+dhccra.man8
+dhctra
+dhctra.man8

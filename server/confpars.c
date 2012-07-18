@@ -2453,7 +2453,8 @@ void parse_shared_net_declaration (cfile, group)
 static int
 common_subnet_parsing(struct parse *cfile, 
 		      struct shared_network *share,
-		      struct subnet *subnet) {
+		      struct subnet *subnet,
+		      int af) {
 	enum dhcp_token token;
 	struct subnet *t, *u;
 	const char *val;
@@ -2482,6 +2483,11 @@ common_subnet_parsing(struct parse *cfile,
 			if (!parse_semi(cfile))
 				break;
 			continue;
+		} else if (local_family != af) {
+			parse_warn(cfile, "not empty cross IP version subnet "
+				   "declaration.");
+			skip_to_semi(cfile);
+			break;
 		}
 		declaration = parse_statement(cfile, subnet->group,
 					      SUBNET_DECL,
@@ -2597,7 +2603,7 @@ void parse_subnet_declaration (cfile, share)
 		return;
 	}
 
-	common_subnet_parsing(cfile, share, subnet);
+	common_subnet_parsing(cfile, share, subnet, AF_INET);
 }
 
 /* subnet6-declaration :==
@@ -2606,7 +2612,7 @@ void parse_subnet_declaration (cfile, share)
 void
 parse_subnet6_declaration(struct parse *cfile, struct shared_network *share) {
 #if !defined(DHCPv6)
-	parse_warn(cfile, "No DHCPv6 support.");
+	parse_warn(cfile, "No IPv6 support.");
 	skip_to_semi(cfile);
 #else /* defined(DHCPv6) */
 	struct subnet *subnet;
@@ -2619,12 +2625,14 @@ parse_subnet6_declaration(struct parse *cfile, struct shared_network *share) {
 				    0xF0, 0xF8, 0xFC, 0xFE };
 	struct iaddr iaddr;
 
+#if 0
         if (local_family != AF_INET6) {
                 parse_warn(cfile, "subnet6 statement is only supported "
 				  "in DHCPv6 mode.");
                 skip_to_semi(cfile);
                 return;
         }
+#endif
 
 	subnet = NULL;
 	status = subnet_allocate(&subnet, MDL);
@@ -2708,9 +2716,7 @@ parse_subnet6_declaration(struct parse *cfile, struct shared_network *share) {
 		return;
 	}
 
-	if (!common_subnet_parsing(cfile, share, subnet)) {
-		return;
-	}
+	common_subnet_parsing(cfile, share, subnet, AF_INET6);
 #endif /* defined(DHCPv6) */
 }
 

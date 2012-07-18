@@ -232,6 +232,19 @@ if_register_socket(struct interface_info *info, int family,
 		}
 	}
 #endif
+#if defined(DHCPv6) && defined(IPV6_V6ONLY)
+	/*
+	 * IPv6 sockets should be IPv6 only. Must be set before bind().
+	 */
+	if (local_family == AF_INET6) {
+		flag = 1;
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY,
+			       (char *)&flag, sizeof(flag)) < 0) {
+			log_fatal("Can't set IPV6_V6ONLY option on dhcp "
+				  "socket: %m");
+		}
+	}
+#endif
 
 	/* Bind the socket to this interface's IP address. */
 	if (bind(sock, (struct sockaddr *)&name, name_len) < 0) {
@@ -498,7 +511,8 @@ if_register6(struct interface_info *info, int do_multicast) {
 	if (req_multi)
 		if_register_multicast(info);
 
-	get_hw_addr(info->name, &info->hw_address);
+	if (strcmp(info->name, "ipv6") != 0)
+		get_hw_addr(info->name, &info->hw_address);
 
 	if (!quiet_interface_discovery) {
 		if (info->shared_network != NULL) {

@@ -30,7 +30,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-sbin_PROGRAMS = dhcrelay$(EXEEXT)
+sbin_PROGRAMS = dhcrelay$(EXEEXT) dhccra$(EXEEXT) dhctra$(EXEEXT)
 subdir = relay
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -43,9 +43,17 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(sbindir)" "$(DESTDIR)$(man8dir)"
 sbinPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(sbin_PROGRAMS)
+am_dhccra_OBJECTS = dhccra.$(OBJEXT)
+dhccra_OBJECTS = $(am_dhccra_OBJECTS)
+dhccra_DEPENDENCIES = ../common/libdhcp.a ../omapip/libomapi.a \
+	../bind/lib/libdns.a ../bind/lib/libisc.a
 am_dhcrelay_OBJECTS = dhcrelay.$(OBJEXT)
 dhcrelay_OBJECTS = $(am_dhcrelay_OBJECTS)
 dhcrelay_DEPENDENCIES = ../common/libdhcp.a ../omapip/libomapi.a \
+	../bind/lib/libdns.a ../bind/lib/libisc.a
+am_dhctra_OBJECTS = dhctra.$(OBJEXT)
+dhctra_OBJECTS = $(am_dhctra_OBJECTS)
+dhctra_DEPENDENCIES = ../common/libdhcp.a ../omapip/libomapi.a \
 	../bind/lib/libdns.a ../bind/lib/libisc.a
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/includes
 depcomp = $(SHELL) $(top_srcdir)/depcomp
@@ -54,8 +62,8 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(dhcrelay_SOURCES)
-DIST_SOURCES = $(dhcrelay_SOURCES)
+SOURCES = $(dhccra_SOURCES) $(dhcrelay_SOURCES) $(dhctra_SOURCES)
+DIST_SOURCES = $(dhccra_SOURCES) $(dhcrelay_SOURCES) $(dhctra_SOURCES)
 man8dir = $(mandir)/man8
 NROFF = nroff
 MANS = $(man_MANS)
@@ -158,7 +166,15 @@ dhcrelay_SOURCES = dhcrelay.c
 dhcrelay_LDADD = ../common/libdhcp.a ../omapip/libomapi.a \
 		 ../bind/lib/libdns.a ../bind/lib/libisc.a
 
-man_MANS = dhcrelay.8
+dhccra_SOURCES = dhccra.c
+dhccra_LDADD = ../common/libdhcp.a ../omapip/libomapi.a \
+		 ../bind/lib/libdns.a ../bind/lib/libisc.a
+
+dhctra_SOURCES = dhctra.c
+dhctra_LDADD = ../common/libdhcp.a ../omapip/libomapi.a \
+		 ../bind/lib/libdns.a ../bind/lib/libisc.a
+
+man_MANS = dhcrelay.8 dhccra.8 dhctra.8
 EXTRA_DIST = $(man_MANS)
 all: all-am
 
@@ -216,9 +232,15 @@ uninstall-sbinPROGRAMS:
 
 clean-sbinPROGRAMS:
 	-test -z "$(sbin_PROGRAMS)" || rm -f $(sbin_PROGRAMS)
+dhccra$(EXEEXT): $(dhccra_OBJECTS) $(dhccra_DEPENDENCIES) 
+	@rm -f dhccra$(EXEEXT)
+	$(LINK) $(dhccra_OBJECTS) $(dhccra_LDADD) $(LIBS)
 dhcrelay$(EXEEXT): $(dhcrelay_OBJECTS) $(dhcrelay_DEPENDENCIES) 
 	@rm -f dhcrelay$(EXEEXT)
 	$(LINK) $(dhcrelay_OBJECTS) $(dhcrelay_LDADD) $(LIBS)
+dhctra$(EXEEXT): $(dhctra_OBJECTS) $(dhctra_DEPENDENCIES) 
+	@rm -f dhctra$(EXEEXT)
+	$(LINK) $(dhctra_OBJECTS) $(dhctra_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -226,7 +248,9 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dhccra.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dhcrelay.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dhctra.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

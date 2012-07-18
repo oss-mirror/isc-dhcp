@@ -849,6 +849,8 @@ int find_subnet (struct subnet **sp,
 	struct subnet *rv;
 
 	for (rv = subnets; rv; rv = rv -> next_subnet) {
+		if (addr . len != rv -> netmask . len)
+			continue;
 		if (addr_eq (subnet_number (addr, rv -> netmask), rv -> net)) {
 			if (subnet_reference (sp, rv,
 					      file, line) != ISC_R_SUCCESS)
@@ -866,6 +868,8 @@ int find_grouped_subnet (struct subnet **sp,
 	struct subnet *rv;
 
 	for (rv = share -> subnets; rv; rv = rv -> next_sibling) {
+		if (addr . len != rv -> netmask . len)
+			continue;
 		if (addr_eq (subnet_number (addr, rv -> netmask), rv -> net)) {
 			if (subnet_reference (sp, rv,
 					      file, line) != ISC_R_SUCCESS)
@@ -881,6 +885,8 @@ int
 subnet_inner_than(const struct subnet *subnet, 
 		  const struct subnet *scan,
 		  int warnp) {
+	if (subnet->net.len != scan->net.len)
+		return 0;
 	if (addr_eq(subnet_number(subnet->net, scan->netmask), scan->net) ||
 	    addr_eq(subnet_number(scan->net, subnet->netmask), subnet->net)) {
 		char n1buf[sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255")];
@@ -2967,6 +2973,10 @@ void free_everything(void)
 
 	cancel_all_timeouts ();
 	relinquish_timeouts ();
+#ifdef DHCVPv6
+	if (run_as_tsv)
+		relinquish_ackqueue_tsv();
+#endif
 	relinquish_ackqueue();
 	trace_free_all ();
 	group_dereference (&root_group, MDL);

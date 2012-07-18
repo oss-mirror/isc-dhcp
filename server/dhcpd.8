@@ -1,6 +1,6 @@
 .\"	dhcpd.8
 .\"
-.\" Copyright (c) 2009-2011 by Internet Systems Consortium, Inc. ("ISC")
+.\" Copyright (c) 2009-2012 by Internet Systems Consortium, Inc. ("ISC")
 .\" Copyright (c) 2004-2007 by Internet Systems Consortium, Inc. ("ISC")
 .\" Copyright (c) 1996-2003 by Internet Software Consortium
 .\"
@@ -57,6 +57,9 @@ dhcpd - Dynamic Host Configuration Protocol Server
 .B -4
 | 
 .B -6
+]
+[
+.B -tsv
 ]
 [
 .B -s
@@ -195,6 +198,12 @@ Run as a DHCP server. This is the default and cannot be combined with
 .TP
 .BI \-6
 Run as a DHCPv6 server. This cannot be combined with \fB\-4\fR.
+.TP
+.BI \-tsv
+Run as a DHCPv4 IPv6-transport server. This cannot be combined
+with \fB\-6\fR. When combined with \fB\-4\fR, the DHCPv4 server
+accepts both queries transported by IPv6 and standard queries
+over IPv4.
 .TP
 .BI \-p \ port
 The udp port number on which 

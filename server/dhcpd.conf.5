@@ -1540,6 +1540,11 @@ It may also be used to provide subnet-specific parameters and to
 specify what addresses may be dynamically allocated to clients booting
 on that subnet. 
 .PP
+It can be used too with IPv6-Transport Relay Agents to match CRA6ADDR
+Relay Agent options. In this case, there must be no \fIparameters\fR
+nor \fIdeclarations\fR, and it should be part of a \fIshared-network\fR
+declaration.
+.PP
 The
 .I subnet6-number
 should be an IPv6 network identifier, specified as ip6-address/bits.
@@ -2469,6 +2474,18 @@ you see lines of this format at startup:
 Note also that since this bind()s all DHCP sockets to the specified
 address, that only one address may be supported in a daemon at a given
 time.
+.RE
+.PP
+The
+.I local-address6
+statement
+.RS 0.25i
+.PP
+.B local-address6 \fIaddress\fB;\fR
+.PP
+This statement causes the DHCP server to listen for DHCP requests sent
+to the specified IPv6 \fIaddress\fR, rather than requests sent to multicast
+addresses.
 .RE
 .PP
 The

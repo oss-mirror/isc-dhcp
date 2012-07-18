@@ -1,0 +1,136 @@
+.\"	dhccra.8
+.\"
+.\" Copyright (c) 2009-2012 by Internet Systems Consortium, Inc. ("ISC")
+.\" Copyright (c) 2004,2007 by Internet Systems Consortium, Inc. ("ISC")
+.\" Copyright (c) 1997-2003 by Internet Software Consortium
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+.\" OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"   Internet Systems Consortium, Inc.
+.\"   950 Charter Street
+.\"   Redwood City, CA 94063
+.\"   <info@isc.org>
+.\"   https://www.isc.org/
+.\"
+.\" This software has been written for Internet Systems Consortium
+.\" by Ted Lemon in cooperation with Vixie Enterprises.
+.\"
+.\" Support and other services are available for ISC products - see
+.\" https://www.isc.org for more information or to learn more about ISC.
+.\"
+.\" $Id$
+.\"
+.TH dhccra 8
+.SH NAME
+dhccra - DHCPv4-over-IPv6 Client Relay Agent
+.SH SYNOPSIS
+.B dhccra
+[
+.B -dq
+]
+[
+.B -p
+.I port
+]
+[
+.B -c
+.I count
+]
+[
+.B -pf
+.I pid-file
+]
+[
+.B --no-pid
+]
+[
+.B -l4
+.I local-ipv4-address
+]
+[
+.B -l6
+.I local-ipv6-address
+]
+.B -S
+.I node | link
+.B -i
+.I interface
+.I server0
+[
+.I ...serverN
+]
+.SH DESCRIPTION
+The Internet Systems Consortium DHCPv4 over IPv6 Client Relay Agent,
+dhccra, provides a means for relaying DHCPv4 requests from a subnet to
+which no DHCP server is directly connected to one or more DHCP
+IPv6-transport servers.
+.SH OPERATION
+.PP
+The DHCP Client Relay Agent listens for DHCPv4 queries from clients on
+the given interface, passing them along over IPv6 to ``upstream''
+servers or relay agents as specified on the command line.  When a
+reply is received from upstream, it is broadcast or unicast back
+downstream to the source of the original request.
+.SH COMMAND LINE
+.TP
+-c COUNT
+Maximum hop count.  When forwarding packets, dhccra discards packets
+which have reached a hop count of COUNT.  Default is 10.  Maximum is 255.
+.TP
+-d
+Force dhccra to run as a foreground process.  Useful when running
+dhccra under a debugger, or running out of inittab on System V systems.
+.TP
+-p PORT
+Listen and transmit on port PORT.  This is mostly useful for debugging
+purposes.  Default is port 67.
+.TP
+-q
+Quiet mode.  Prevents dhccra from printing its network configuration
+on startup.
+.TP
+-S \fInode|link\fR
+Serve only the colocated client (node) as a HCRA or serve the attached
+link (link) as a LCRA.
+Note this is mandatory, i.e., there is no default.
+.TP
+-pf pid-file
+Path to alternate pid file.
+.TP
+--no-pid
+Option to disable writing pid files.  By default the program
+will write a pid file.
+.TP
+-l4 \fIlocal-ipv4-address\fR
+Bound the fallback to the \fIlocal-ipv4-address\fR to avoid conflicts
+with a wildcard DHCPv4 server running on the same box.
+.TP
+-l6 \fIlocal-ipv6-address\fR
+Use the \fIlocal-ipv4-address\fR as the source for the IPv6 transport.
+.TP
+-i \fIifname\fR
+Listen for DHCPv4 queries on interface \fIifname\fR.
+.TP
+server
+A list of one or more server IPv6 addresses to which DHCP queries should be
+relayed over IPv6.
+.SH SEE ALSO
+dhctra(8), dhcrelay(8), dhclient(8), dhcpd(8), RFC3315, RFC2132, RFC2131.
+.SH BUGS
+The spec limits the Client Relay Agent to only one IPv4 interface.
+To run more than one Client Relay Agent, each daemon serving a different
+interface, the -l option with different IPv6 addresses should be used.
+.SH AUTHOR
+.B dhccra(8)
+To learn more about Internet Systems Consortium, see
+.B https://www.isc.org

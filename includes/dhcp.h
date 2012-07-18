@@ -188,6 +188,9 @@ struct dhcp_packet {
 #define RAI_REMOTE_ID	2
 #define RAI_AGENT_ID	3
 #define RAI_LINK_SELECT	5
+#ifndef RAI_CRA6ADDR
+#define RAI_CRA6ADDR	46
+#endif
 
 /* FQDN suboptions: */
 #define FQDN_NO_CLIENT_UPDATE		1

@@ -1652,6 +1652,13 @@ dhcp(struct packet *packet) {
 	return;
 }
 
+#ifdef DHCPv6
+void
+dhcp_tsv(struct packet *packet) {
+	return;
+}
+#endif
+
 void
 classify(struct packet *p, struct class *c) {
 	return;

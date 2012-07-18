@@ -14,6 +14,12 @@ void
 dhcp(struct packet *packet) {
 }
 
+#ifdef DHCPv6
+void
+dhcp_tsv(struct packet *packet) {
+}
+#endif
+
 void
 dhcpv6(struct packet *packet) {
 }

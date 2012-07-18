@@ -3936,6 +3936,95 @@ do_packet6(struct interface_info *interface, const char *packet,
 
 	packet_dereference(&decoded_packet, MDL);
 }
+
+void
+do_packet_tsv(struct interface_info *interface, const char *msg,
+	      int len, int from_port, const struct iaddr *from,
+	      isc_boolean_t was_unicast)
+{
+	struct dhcp_packet *packet;
+	struct option_cache *op;
+	struct packet *decoded_packet;
+#if defined (DEBUG_MEMORY_LEAKAGE)
+	unsigned long previous_outstanding = dmalloc_outstanding;
+#endif
+
+	packet = (struct dhcp_packet *)msg;
+
+#if defined (TRACING)
+	trace_inpacket_stash (interface, packet,
+			      (unsigned)len, (unsigned int)from_port,
+			      *from, (struct hardware *)0);
+#endif
+
+	decoded_packet = (struct packet *)0;
+	if (!packet_allocate (&decoded_packet, MDL)) {
+		log_error ("do_packet: no memory for incoming packet!");
+		return;
+	}
+	decoded_packet -> raw = packet;
+	decoded_packet -> packet_length = (unsigned)len;
+	decoded_packet -> client_port = from_port;
+	decoded_packet -> client_addr = *from;
+	interface_reference (&decoded_packet -> interface, interface, MDL);
+	decoded_packet -> unicast = was_unicast;
+
+	if (packet -> hlen > sizeof packet -> chaddr) {
+		packet_dereference (&decoded_packet, MDL);
+		log_info ("Discarding packet with bogus hlen.");
+		return;
+	}
+
+	/* If there's an option buffer, try to parse it. */
+	if (decoded_packet -> packet_length >= DHCP_FIXED_NON_UDP + 4) {
+		if (!parse_options (decoded_packet)) {
+			if (decoded_packet -> options)
+				option_state_dereference
+					(&decoded_packet -> options, MDL);
+			packet_dereference (&decoded_packet, MDL);
+			return;
+		}
+
+		if (decoded_packet -> options_valid &&
+		    (op = lookup_option (&dhcp_universe,
+					 decoded_packet -> options, 
+					 DHO_DHCP_MESSAGE_TYPE))) {
+			struct data_string dp;
+			memset (&dp, 0, sizeof dp);
+			evaluate_option_cache (&dp, decoded_packet,
+					       (struct lease *)0,
+					       (struct client_state *)0,
+					       decoded_packet -> options,
+					       (struct option_state *)0,
+					       (struct binding_scope **)0,
+					       op, MDL);
+			if (dp.len > 0)
+				decoded_packet -> packet_type = dp.data [0];
+			else
+				decoded_packet -> packet_type = 0;
+			data_string_forget (&dp, MDL);
+		}
+	}
+		
+	if (decoded_packet -> packet_type)
+		dhcp_tsv (decoded_packet);
+
+	/* If the caller kept the packet, they'll have upped the refcnt. */
+	packet_dereference (&decoded_packet, MDL);
+
+#if defined (DEBUG_MEMORY_LEAKAGE)
+	log_info ("generation %ld: %ld new, %ld outstanding, %ld long-term",
+		  dmalloc_generation,
+		  dmalloc_outstanding - previous_outstanding,
+		  dmalloc_outstanding, dmalloc_longterm);
+#endif
+#if defined (DEBUG_MEMORY_LEAKAGE)
+	dmalloc_dump_outstanding ();
+#endif
+#if defined (DEBUG_RC_HISTORY_EXHAUSTIVELY)
+	dump_rc_history (0);
+#endif
+}
 #endif /* DHCPv6 */
 
 int

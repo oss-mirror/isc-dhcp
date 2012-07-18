@@ -999,6 +999,10 @@ int commit_leases ()
 	}
 
 	/* send out all deferred ACKs now */
+#ifdef DHCPv6
+	if (run_as_tsv)
+		flush_ackqueue_tsv(NULL);
+#endif
 	flush_ackqueue(NULL);
 
 	/* If we haven't rewritten the lease database in over an

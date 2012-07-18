@@ -3,7 +3,7 @@
    DHCP Server Daemon. */
 
 /*
- * Copyright (c) 2004-2011 by Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (c) 2004-2012 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-2003 by Internet Software Consortium
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -381,12 +381,27 @@ main(int argc, char **argv) {
 			}
 			local_family = AF_INET;
 			local_family_set = 1;
+			if (run_as_tsv)
+				run_as_tsv = 2;
 		} else if (!strcmp(argv[i], "-6")) {
 			if (local_family_set && (local_family != AF_INET6)) {
 				log_fatal("Server cannot run in both IPv4 and "
 					  "IPv6 mode at the same time.");
 			}
 			local_family = AF_INET6;
+			local_family_set = 1;
+		} else if (!strcmp(argv[i], "-tsv")) {
+			if (local_family_set && (local_family != AF_INET)) {
+				log_fatal("The IPv6-transport server mode is "
+					  "implies DHCPv4: server cannot run "
+					  "in both IPv4 and IPv6 mode at "
+					  "the same time.");
+			}
+			if (local_family_set)
+				run_as_tsv = 2;
+			else
+				run_as_tsv = 1;
+			local_family = AF_INET;
 			local_family_set = 1;
 #endif /* DHCPv6 */
 		} else if (!strcmp (argv [i], "--version")) {
@@ -582,6 +597,10 @@ main(int argc, char **argv) {
 			log_fatal("You can only specify address to send "
 			          "replies to when running an IPv4 server.");
 		}
+		if (run_as_tsv) {
+			log_fatal("-s server is incompatible with "
+				  "the IPv6-transport server mode(-tsv).");
+		}
 		if (!inet_aton (server, &limited_broadcast)) {
 			struct hostent *he;
 			he = gethostbyname (server);
@@ -623,7 +642,10 @@ main(int argc, char **argv) {
 	dhcp_interface_setup_hook = dhcpd_interface_setup_hook;
 	bootp_packet_handler = do_packet;
 #ifdef DHCPv6
-	dhcpv6_packet_handler = do_packet6;
+	if (!run_as_tsv)
+		dhcpv6_packet_handler = do_packet6;
+	else
+		dhcpv6_packet_handler = do_packet_tsv;
 #endif /* DHCPv6 */
 
 #if defined (NSUPDATE)
@@ -705,7 +727,19 @@ main(int argc, char **argv) {
 		exit (0);
 
 	/* Discover all the network interfaces and initialize them. */
-	discover_interfaces(DISCOVER_SERVER);
+#ifdef DHCPv6
+	if (run_as_tsv > 1) {
+		discover_interfaces(DISCOVER_SERVER);
+		local_family = AF_INET6;
+		discover_interfaces(DISCOVER_SERVER);
+		local_family = AF_INET;
+	} else if (run_as_tsv) {
+		local_family = AF_INET6;
+		discover_interfaces(DISCOVER_SERVER);
+		local_family = AF_INET;
+	} else
+#endif
+		discover_interfaces(DISCOVER_SERVER);
 
 #ifdef DHCPv6
 	/*
@@ -955,6 +989,25 @@ void postconf_initialization (int quiet)
                         data_string_forget (&db, MDL);
                         path_dhcpd_pid = s;
                 }
+	}
+
+	if ((local_family == AF_INET6) || run_as_tsv) {
+
+		oc = lookup_option (&server_universe, options,
+				    SV_LOCAL_ADDRESS6);
+		if (oc &&
+		    evaluate_option_cache (&db, (struct packet *)0,
+					   (struct lease *)0,
+					   (struct client_state *)0,
+					   options, (struct option_state *)0,
+					   &global_scope, oc, MDL)) {
+			if (db.len == 16) {
+				memcpy (&local_address6, db.data, 16);
+			} else
+				log_fatal ("invalid local address "
+					   "data length");
+			data_string_forget (&db, MDL);
+		}
         }
 #endif /* DHCPv6 */
 
@@ -1019,32 +1072,38 @@ void postconf_initialization (int quiet)
 		data_string_forget (&db, MDL);
 	}
 
-	oc = lookup_option (&server_universe, options,
-			    SV_LIMITED_BROADCAST_ADDRESS);
-	if (oc &&
-	    evaluate_option_cache (&db, (struct packet *)0,
-				   (struct lease *)0, (struct client_state *)0,
-				   options, (struct option_state *)0,
-				   &global_scope, oc, MDL)) {
-		if (db.len == 4) {
-			memcpy (&limited_broadcast, db.data, 4);
-		} else
-			log_fatal ("invalid broadcast address data length");
-		data_string_forget (&db, MDL);
-	}
+	if ((local_family == AF_INET) && (run_as_tsv != 1)) {
+		oc = lookup_option (&server_universe, options,
+				    SV_LIMITED_BROADCAST_ADDRESS);
+		if (oc &&
+		    evaluate_option_cache (&db, (struct packet *)0,
+					   (struct lease *)0,
+					   (struct client_state *)0,
+					   options, (struct option_state *)0,
+					   &global_scope, oc, MDL)) {
+			if (db.len == 4) {
+				memcpy (&limited_broadcast, db.data, 4);
+			} else
+				log_fatal ("invalid broadcast address "
+					   "data length");
+			data_string_forget (&db, MDL);
+		}
 
-	oc = lookup_option (&server_universe, options,
-			    SV_LOCAL_ADDRESS);
-	if (oc &&
-	    evaluate_option_cache (&db, (struct packet *)0,
-				   (struct lease *)0, (struct client_state *)0,
-				   options, (struct option_state *)0,
-				   &global_scope, oc, MDL)) {
-		if (db.len == 4) {
-			memcpy (&local_address, db.data, 4);
-		} else
-			log_fatal ("invalid local address data length");
-		data_string_forget (&db, MDL);
+		oc = lookup_option (&server_universe, options,
+				    SV_LOCAL_ADDRESS);
+		if (oc &&
+		    evaluate_option_cache (&db, (struct packet *)0,
+					   (struct lease *)0,
+					   (struct client_state *)0,
+					   options, (struct option_state *)0,
+					   &global_scope, oc, MDL)) {
+			if (db.len == 4) {
+				memcpy (&local_address, db.data, 4);
+			} else
+				log_fatal ("invalid local address "
+					   "data length");
+			data_string_forget (&db, MDL);
+		}
 	}
 
 	oc = lookup_option (&server_universe, options, SV_DDNS_UPDATE_STYLE);
@@ -1209,7 +1268,8 @@ usage(void) {
 
 	log_fatal("Usage: dhcpd [-p <UDP port #>] [-f] [-d] [-q] [-t|-T]\n"
 #ifdef DHCPv6
-		  "             [-4|-6] [-cf config-file] [-lf lease-file]\n"
+		  "             [-4|-6|-tsv] [-cf config-file]"
+			      " [-lf lease-file]\n"
 #else /* !DHCPv6 */
 		  "             [-cf config-file] [-lf lease-file]\n"
 #endif /* DHCPv6 */
@@ -1284,7 +1344,12 @@ void lease_ping_timeout (vlp)
 #endif
 
 	--outstanding_pings;
-	dhcp_reply (lp);
+#ifdef DHCPv6
+	if (run_as_tsv && lp->state && (lp->state->from.len == 16))
+		dhcp_reply_tsv (lp);
+	else
+#endif
+		dhcp_reply (lp);
 
 #if defined (DEBUG_MEMORY_LEAKAGE)
 	log_info ("generation %ld: %ld new, %ld outstanding, %ld long-term",
@@ -1343,7 +1408,9 @@ int dhcpd_interface_setup_hook (struct interface_info *ip, struct iaddr *ia)
 		
 		if (!share -> interface) {
 			interface_reference (&share -> interface, ip, MDL);
-		} else if (share -> interface != ip) {
+		} else if ((share -> interface != ip) &&
+			   (strcmp (share -> interface -> name,
+				    ip -> name))) {
 			log_error ("Multiple interfaces match the %s: %s %s", 
 				   "same shared network",
 				   share -> interface -> name, ip -> name);

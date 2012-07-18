@@ -3,7 +3,8 @@
    Find and identify the network interfaces. */
 
 /*
- * Copyright (c) 2004-2009,2011 by Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (c) 2011-2012 by Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (c) 2004-2009 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1995-2003 by Internet Software Consortium
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -45,6 +46,7 @@
 struct interface_info *interfaces, *dummy_interfaces, *fallback_interface;
 int interfaces_invalidated;
 int quiet_interface_discovery;
+int run_as_tsv;
 u_int16_t local_port;
 u_int16_t remote_port;
 int (*dhcp_interface_setup_hook) (struct interface_info *, struct iaddr *);
@@ -948,21 +950,31 @@ discover_interfaces(int state) {
 
 	/* If we already have a list of interfaces, and we're running as
 	   a DHCP server, the interfaces were requested. */
-	if (interfaces && (state == DISCOVER_SERVER ||
-			   state == DISCOVER_RELAY ||
-			   state == DISCOVER_REQUESTED))
+	if (interfaces && !run_as_tsv &&
+	    (state == DISCOVER_SERVER ||
+	     state == DISCOVER_RELAY ||
+	     state == DISCOVER_REQUESTED))
 		ir = 0;
 	else if (state == DISCOVER_UNCONFIGURED)
 		ir = INTERFACE_REQUESTED | INTERFACE_AUTOMATIC;
 	else
 		ir = INTERFACE_REQUESTED;
 
+	/* Set the address family of all interfaces. */
+	if (interfaces) {
+		for (tmp = interfaces; tmp; tmp = tmp->next) {
+			if (tmp->address_family == 0)
+				tmp->address_family = local_family;
+		}
+	}
+
 	/* Cycle through the list of interfaces looking for IP addresses. */
 	while (next_iface(&info, &err, &ifaces)) {
 
 		/* See if we've seen an interface that matches this one. */
 		for (tmp = interfaces; tmp; tmp = tmp->next) {
-			if (!strcmp(tmp->name, info.name))
+			if ((tmp->address_family == local_family) &&
+			    (!strcmp(tmp->name, info.name)))
 				break;
 		}
 
@@ -991,6 +1003,7 @@ discover_interfaces(int state) {
 					  info.name, isc_result_totext(status));
 			}
 			strcpy(tmp->name, info.name);
+			tmp->address_family = local_family;
 			interface_snorf(tmp, ir);
 			interface_dereference(&tmp, MDL);
 			tmp = interfaces; /* XXX */
@@ -1095,10 +1108,12 @@ discover_interfaces(int state) {
 			interface_dereference (&next, MDL);
 		if (tmp -> next)
 			interface_reference (&next, tmp -> next, MDL);
-		/* skip interfaces that are running already */
-		if (tmp -> flags & INTERFACE_RUNNING) {
+		/* skip interfaces that are running already
+		   or belong to the other address family */
+		if ((tmp -> flags & INTERFACE_RUNNING) ||
+		    (tmp -> address_family != local_family)) {
 			interface_dereference(&tmp, MDL);
-			if(next)
+			if (next)
 				interface_reference(&tmp, next, MDL);
 			continue;
 		}
@@ -1119,7 +1134,8 @@ discover_interfaces(int state) {
 					interface_dereference (&interfaces,
 							       MDL);
 				if (next)
-				interface_reference (&interfaces, next, MDL);
+					interface_reference (&interfaces,
+							     next, MDL);
 			} else {
 				interface_dereference (&last -> next, MDL);
 				if (next)
@@ -1237,7 +1253,7 @@ discover_interfaces(int state) {
 			if_register_send(tmp);
 #ifdef DHCPv6
 		} else {
-			if ((state == DISCOVER_SERVER) ||
+			if (((state == DISCOVER_SERVER) && !run_as_tsv) ||
 			    (state == DISCOVER_RELAY)) {
 				if_register6(tmp, 1);
 			} else {
@@ -1272,9 +1288,11 @@ discover_interfaces(int state) {
 	 */
 	for (tmp = interfaces; tmp; tmp = tmp -> next) {
 		/* not if it's been registered before */
-		if (tmp -> flags & INTERFACE_RUNNING)
+		if (tmp -> registered)
 			continue;
 		if (tmp -> rfdesc == -1)
+			continue;
+		if (tmp -> address_family != local_family)
 			continue;
 		switch (local_family) {
 #ifdef DHCPv6 
@@ -1295,6 +1313,7 @@ discover_interfaces(int state) {
 		if (status != ISC_R_SUCCESS)
 			log_fatal ("Can't register I/O handle for %s: %s",
 				   tmp -> name, isc_result_totext (status));
+		tmp -> registered = 1;
 
 #if defined(DHCPv6)
 		/* Only register the first interface for V6, since they all
@@ -1427,7 +1446,9 @@ isc_result_t got_one (h)
 		 * source interface by interface index.
 		 */
 		ip = interfaces;
-		while ((ip != NULL) && (if_nametoindex(ip->name) != ifindex))
+		while ((ip != NULL) &&
+		       ((ip->address_family == AF_INET6) ||
+			(if_nametoindex(ip->name) != ifindex)))
 			ip = ip->next;
 		if (ip == NULL)
 			return ISC_R_NOTFOUND;
@@ -1492,7 +1513,9 @@ got_one_v6(omapi_object_t *h) {
 
 		/* Seek forward to find the matching source interface. */
 		ip = interfaces;
-		while ((ip != NULL) && (if_nametoindex(ip->name) != if_idx))
+		while ((ip != NULL) &&
+		       ((ip->address_family == AF_INET) ||
+			(if_nametoindex(ip->name) != if_idx)))
 			ip = ip->next;
 
 		if (ip == NULL)

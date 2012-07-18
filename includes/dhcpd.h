@@ -720,6 +720,7 @@ struct lease_state {
 #endif
 #endif
 #define SV_CACHE_THRESHOLD		78
+#define SV_LOCAL_ADDRESS6		79
 
 #if !defined (DEFAULT_PING_TIMEOUT)
 # define DEFAULT_PING_TIMEOUT 1
@@ -1227,6 +1228,7 @@ struct interface_info {
 	struct shared_network *shared_network;
 				/* Networks connected to this interface. */
 	struct hardware hw_address;	/* Its physical address. */
+	int address_family;		/* Its address family */
 	struct in_addr *addresses;	/* Addresses associated with this
 					 * interface.
 					 */
@@ -1261,6 +1263,8 @@ struct interface_info {
 	int configured;			/* If set to 1, interface has at least
 					 * one valid IP address.
 					 */
+	int registered;			/* If set to 1, interface read file
+					   descriptor is registered. */
 	u_int32_t flags;		/* Control flags... */
 #define INTERFACE_REQUESTED 1
 #define INTERFACE_AUTOMATIC 2
@@ -1839,6 +1843,8 @@ void do_packet (struct interface_info *,
 		unsigned int, struct iaddr, struct hardware *);
 void do_packet6(struct interface_info *, const char *,
 		int, int, const struct iaddr *, isc_boolean_t);
+void do_packet_tsv(struct interface_info *, const char *,
+		   int, int, const struct iaddr *, isc_boolean_t);
 int packet6_len_okay(const char *, int);
 
 int validate_packet(struct packet *);
@@ -1849,6 +1855,7 @@ int add_option(struct option_state *options,
 	       unsigned int data_len);
 
 /* dhcpd.c */
+extern int run_as_tsv;
 extern struct timeval cur_tv;
 #define cur_time cur_tv.tv_sec
 
@@ -1874,6 +1881,9 @@ isc_result_t dhcp_set_control_state (control_object_state_t oldstate,
 				     control_object_state_t newstate);
 #if defined (DEBUG_MEMORY_LEAKAGE_ON_EXIT)
 void relinquish_ackqueue(void);
+#ifdef DHCPv6
+void relinquish_ackqueue_tsv(void);
+#endif
 #endif
 
 /* conflex.c */
@@ -2165,8 +2175,25 @@ void get_server_source_address(struct in_addr *from,
 			       struct option_state *options,
 			       struct packet *packet);
 
+/* tsv.c */
+void dhcp_tsv (struct packet *);
+void dhcpdiscover_tsv (struct packet *, int);
+void dhcprequest_tsv (struct packet *, int, struct lease *);
+void dhcprelease_tsv (struct packet *, int);
+void dhcpdecline_tsv (struct packet *, int);
+void dhcpinform_tsv (struct packet *, int);
+void nak_lease_tsv (struct packet *, struct iaddr *cip);
+void ack_lease_tsv (struct packet *, struct lease *,
+		    unsigned int, TIME, char *, int, struct host_decl *);
+void delayed_ack_enqueue_tsv(struct lease *);
+void flush_ackqueue_tsv(void *);
+void dhcp_reply_tsv (struct lease *);
+
+int locate_network_tsv (struct packet *);
+
 /* dhcpleasequery.c */
 void dhcpleasequery (struct packet *, int);
+void dhcpleasequery_tsv (struct packet *, int);
 void dhcpv6_leasequery (struct data_string *, struct packet *);
 
 /* dhcpv6.c */
