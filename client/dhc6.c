@@ -42,6 +42,10 @@ struct option *iaaddr_option = NULL;
 struct option *iaprefix_option = NULL;
 struct option *oro_option = NULL;
 struct option *irt_option = NULL;
+struct option *pubkey_option = NULL;
+struct option *cert_option = NULL;
+struct option *sign_option = NULL;
+struct option *timestmp_option = NULL;
 
 static struct dhc6_lease *dhc6_dup_lease(struct dhc6_lease *lease,
 					 const char *file, int line);
@@ -115,6 +119,7 @@ static isc_boolean_t active_prefix(struct client_state *client);
 static int check_timing6(struct client_state *client, u_int8_t msg_type, 
 		         char *msg_str, struct dhc6_lease *lease,
 		         struct data_string *ds);
+static void secure_dhc6_add(struct data_string *packet);
 
 extern int onetry;
 extern int stateless;
@@ -202,6 +207,27 @@ dhcpv6_client_assignments(void)
 	if (!option_code_hash_lookup(&irt_option, dhcpv6_universe.code_hash,
 				     &code, 0, MDL))
 		log_fatal("Unable to find the IRT option definition.");
+
+	code = D6O_PUBLIC_KEY;
+	if (!option_code_hash_lookup(&pubkey_option, dhcpv6_universe.code_hash,
+				     &code, 0, MDL))
+		log_fatal("Unable to find the PUBKEY option definition.");
+
+	code = D6O_CERTIFICATE;
+	if (!option_code_hash_lookup(&cert_option, dhcpv6_universe.code_hash,
+				     &code, 0, MDL))
+		log_fatal("Unable to find the CERT option definition.");
+
+	code = D6O_SIGNATURE;
+	if (!option_code_hash_lookup(&sign_option, dhcpv6_universe.code_hash,
+				     &code, 0, MDL))
+		log_fatal("Unable to find the SIGN option definition.");
+
+	code = D6O_TIMESTAMP;
+	if (!option_code_hash_lookup(&timestmp_option,
+				     dhcpv6_universe.code_hash,
+				     &code, 0, MDL))
+		log_fatal("Unable to find the TIMESTMP option definition.");
 
 #ifndef __CYGWIN32__ /* XXX */
 	endservent();
@@ -1845,6 +1871,11 @@ do_init6(void *input)
 		data_string_forget(&ia, MDL);
 	}
 
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
+
 	/* Transmit and wait. */
 
 	log_info("XMT: Solicit on %s, interval %ld0ms.",
@@ -1899,6 +1930,11 @@ do_info_request6(void *input)
 	dhcpv6_universe.encapsulate(&ds, NULL, NULL, client,
 				    NULL, client->sent_options, &global_scope,
 				    &dhcpv6_universe);
+
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
 
 	/* Transmit and wait. */
 
@@ -1988,6 +2024,11 @@ do_confirm6(void *input)
 		data_string_forget(&ds, MDL);
 		return;
 	}
+
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
 
 	/* Transmit and wait. */
 
@@ -2101,6 +2142,11 @@ do_release6(void *input)
 		data_string_forget(&ds, MDL);
 		goto release_done;
 	}
+
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
 
 	/* Transmit and wait. */
 	log_info("XMT: Release on %s, interval %ld0ms.",
@@ -3196,6 +3242,11 @@ do_select6(void *input)
 		data_string_forget(&ds, MDL);
 		return;
 	}
+
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
 
 	log_info("XMT: Request on %s, interval %ld0ms.",
 		 client->name ? client->name : client->interface->name,
@@ -4513,6 +4564,11 @@ do_refresh6(void *input)
 		return;
 	}
 
+	/* Add secure DHCPv6 options. */
+
+	if (is_secure)
+		secure_dhc6_add(&ds);
+
 	log_info("XMT: %s on %s, interval %ld0ms.",
 		 dhcpv6_type_names[client->refresh_type],
 		 client->name ? client->name : client->interface->name,
@@ -5111,5 +5167,98 @@ active_prefix(struct client_state *client)
 		}
 	}
 	return ISC_TRUE;
+}
+
+static void
+secure_dhc6_add(struct data_string *packet)
+{
+	struct data_string tbs;
+	struct data_string sign;
+	dst_context_t *ctx = NULL;
+	isc_region_t r;
+	isc_buffer_t sigbuf;
+	unsigned int siglen = 0;
+	isc_result_t result;
+
+	/* Prepare a to be signed copy of the packet */
+	memset(&tbs, 0, sizeof(tbs));
+	memset(&sign, 0, sizeof(sign));
+	if (!buffer_allocate(&tbs.buffer, packet->len, MDL)) {
+		log_error("Unable to allocate memory for to be signed.");
+		return;
+	}
+	memcpy(tbs.buffer->data, packet->buffer->data, packet->len);
+	tbs.data = tbs.buffer->data;
+	tbs.len = packet->len;
+
+	/* Prepare the signature option */
+	result = dst_key_sigsize(key, &siglen);
+	if (result != ISC_R_SUCCESS) {
+		log_error("dst_key_sigsize: %s.", isc_result_totext(result));
+		data_string_forget(&tbs, MDL);
+		return;
+	}
+	if (!buffer_allocate(&sign.buffer, siglen, MDL)) {
+		log_error("Unable to allocate memory for signature.");
+		data_string_forget(&tbs, MDL);
+		return;
+	}
+	memset(sign.buffer->data, 0, siglen + 2);
+	sign.data = sign.buffer->data;
+	sign.len = siglen + 2;
+	/* TODO: map algos */
+	sign.buffer->data[0] = SHA_256;
+	sign.buffer->data[1] = RSASSA_PKCS1v1_5;
+
+	/* Push the signature on the to be signed copy */
+	if (!append_option(&tbs, &dhcpv6_universe, sign_option, &sign)) {
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&sign, MDL);
+		return;
+	}
+
+	/* Get a signing context */
+	result = dst_context_create(key, dhcp_gbl_ctx.mctx, &ctx);
+	if (result != ISC_R_SUCCESS) {
+		log_error("dst_context_create: %s.",
+			  isc_result_totext(result));
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&sign, MDL);
+		return;
+	}
+
+	/* Digest the to be signed copy */
+	r.base = tbs.buffer->data;
+	r.length = tbs.len;
+	result = dst_context_adddata(ctx, &r);
+	if (result != ISC_R_SUCCESS) {
+		log_error("dst_context_adddata: %s.",
+			  isc_result_totext(result));
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&sign, MDL);
+		dst_context_destroy(&ctx);
+		return;
+	}
+
+	/* Sign */
+	isc_buffer_init(&sigbuf, &sign.buffer->data[2], siglen);
+	result = dst_context_sign(ctx, &sigbuf);
+	data_string_forget(&tbs, MDL);
+	dst_context_destroy(&ctx);
+	if (result != ISC_R_SUCCESS) {
+		log_error("dst_context_sign: %s.",
+			  isc_result_totext(result));
+		data_string_forget(&sign, MDL);
+		return;
+	}
+
+	/* Push the final signature on the packet */
+	if (!append_option(packet, &dhcpv6_universe, sign_option, &sign)) {
+		data_string_forget(&sign, MDL);
+		return;
+	}
+
+	data_string_forget(&sign, MDL);
+	return;
 }
 #endif /* DHCPv6 */

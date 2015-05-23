@@ -544,6 +544,12 @@ static struct option dhcpv6_options[] = {
 	{ "inf-max-rt", "L",			&dhcpv6_universe, 83, 1 },
 #endif
 
+			/* draft-ietf-dhc-sedhcpv6-07.txt OPTIONS */
+	{ "public-key", "X", 			&dhcpv6_universe, 701, 1 },
+	{ "certificate", "X",			&dhcpv6_universe, 702, 1 },
+	{ "signature", "BBX",			&dhcpv6_universe, 703, 1 },
+	{ "timestamp", "LL",			&dhcpv6_universe, 704, 1 },
+
 	{ NULL, NULL, NULL, 0, 0 }
 };
 

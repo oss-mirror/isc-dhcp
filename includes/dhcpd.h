@@ -2803,6 +2803,11 @@ extern const char *path_dhclient_duid;
 
 extern struct client_config top_level_config;
 
+extern int is_secure;
+
+extern dst_key_t *key;
+extern struct data_string public_key;
+
 void dhcpoffer (struct packet *);
 void dhcpack (struct packet *);
 void dhcpnak (struct packet *);

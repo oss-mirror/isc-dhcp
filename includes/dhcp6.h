@@ -76,6 +76,11 @@
 #define D6O_CLT_TIME				46 /* RFC5007 */
 #define D6O_LQ_RELAY_DATA			47 /* RFC5007 */
 #define D6O_LQ_CLIENT_LINK			48 /* RFC5007 */
+/* secure DHCPv6 (draft-ietf-dhc-sedhcpv6-07) */
+#define D6O_PUBLIC_KEY				701
+#define D6O_CERTIFICATE				702
+#define D6O_SIGNATURE				703
+#define D6O_TIMESTAMP				704
 
 /* 
  * Status Codes, from RFC 3315 section 24.4, and RFC 3633, 5007.
@@ -91,6 +96,11 @@
 #define STATUS_MalformedQuery	 8
 #define STATUS_NotConfigured	 9
 #define STATUS_NotAllowed	10
+/* secure DHCPv6 */
+#define STATUS_AlgorithmNotSupported	705
+#define STATUS_AuthenticationFail	706
+#define STATUS_TimestampFail		707
+#define STATUS_SignatureFail		708
 
 /* 
  * DHCPv6 message types, defined in section 5.3 of RFC 3315 
@@ -119,6 +129,12 @@ extern const int dhcpv6_type_name_max;
 #define DUID_LLT	1
 #define DUID_EN		2
 #define DUID_LL		3
+
+/* Secure DHCPv6 (draft-ietf-dhc-sedhcpv6-07.txt)
+ */
+#define SHA_256			1
+#define SHA_512			2
+#define RSASSA_PKCS1v1_5	1
 
 /* Offsets into IA_*'s where Option spaces commence.  */
 #define IA_NA_OFFSET 12 /* IAID, T1, T2, all 4 octets each */
