@@ -5178,6 +5178,7 @@ secure_dhc6_add(struct data_string *packet)
 	isc_region_t r;
 	isc_buffer_t sigbuf;
 	unsigned int siglen = 0;
+	int savedlen = (int) packet->len;
 	isc_result_t result;
 
 	/* Prepare a to be signed copy of the packet */
@@ -5190,6 +5191,14 @@ secure_dhc6_add(struct data_string *packet)
 	memcpy(tbs.buffer->data, packet->buffer->data, packet->len);
 	tbs.data = tbs.buffer->data;
 	tbs.len = packet->len;
+
+	/* Push the public key/certificate option */
+	if (!append_option(&tbs, &dhcpv6_universe,
+			   is_secure == 1 ? pubkey_option : cert_option,
+			   &der)) {
+		data_string_forget(&tbs, MDL);
+		return;
+	}
 
 	/* Prepare the signature option */
 	result = dst_key_sigsize(key, &siglen);
@@ -5252,9 +5261,18 @@ secure_dhc6_add(struct data_string *packet)
 		return;
 	}
 
+	/* Push the public key/certificate option on the packet */
+	if (!append_option(packet, &dhcpv6_universe,
+			   is_secure == 1 ? pubkey_option : cert_option,
+			   &der)) {
+		data_string_forget(&sign, MDL);
+		return;
+	}
+
 	/* Push the final signature on the packet */
 	if (!append_option(packet, &dhcpv6_universe, sign_option, &sign)) {
 		data_string_forget(&sign, MDL);
+		data_string_truncate(packet, savedlen);
 		return;
 	}
 

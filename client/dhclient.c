@@ -92,7 +92,7 @@ char *mockup_relay = NULL;
 
 int is_secure = 0;
 dst_key_t *key = NULL;
-struct data_string public_key;
+struct data_string der;
 const char *path_keys = NULL;
 
 char *progname = NULL;
@@ -109,7 +109,7 @@ static int check_domain_name_list(const char *ptr, size_t len, int dots);
 static int check_option_values(struct universe *universe, unsigned int opt,
 			       const char *ptr, size_t len);
 #ifdef DHCPv6
-static void get_public_key(const char *filename);
+static void get_der(const char *filename);
 #endif
 
 #ifndef UNIT_TEST
@@ -145,7 +145,7 @@ main(int argc, char **argv) {
 
 	/* Initialize client globals. */
 	memset(&default_duid, 0, sizeof(default_duid));
-	memset(&public_key, 0, sizeof(public_key));
+	memset(&der, 0, sizeof(der));
 
 	/* Make sure that file descriptors 0 (stdin), 1, (stdout), and
 	   2 (stderr) are open. To do this, we assume that when we
@@ -422,7 +422,7 @@ main(int argc, char **argv) {
 					  path_keys,
 					  isc_result_totext(status));
 			/* TODO: check key_alg */
-			get_public_key(path_keys);
+			get_der(path_keys);
 		}
 	}
 #endif /* DHCPv6 */
@@ -793,7 +793,7 @@ static void usage()
 	log_fatal("Usage: %s "
 #ifdef DHCPv6
 		  "[-4|-6] [-SNTPI1dvrxi] [-nw] [-p <port>] [-D LL|LLT] \n"
-		  "                [-k public-key private-key]\n"
+		  "                [-k keys-rootname]\n"
 #else /* DHCPv6 */
 		  "[-I1dvrxi] [-nw] [-p <port>] [-D LL|LLT] \n"
 #endif /* DHCPv6 */
@@ -4632,10 +4632,10 @@ add_reject(struct packet *packet) {
 
 #ifdef DHCPv6
 
-#define PUBLIC_KEY_MAXSIZE	16*1024U
+#define DER_MAXSIZE	16*1024U
 
 static void
-get_public_key(const char *filename)
+get_der(const char *filename)
 {
 	size_t len = strlen(filename);
 	char *tmp;
@@ -4643,12 +4643,17 @@ get_public_key(const char *filename)
 	isc_result_t ret;
 	off_t size = 0;
 
-	len += 7 + 1;
+	len += 20;
 	tmp = dmalloc(len, MDL);
 	if (!tmp)
 		log_fatal("No memory for %s", filename);
-	(void) snprintf(tmp, len, "%s.pubder", filename);
+	(void) snprintf(tmp, len, "%s.pubkeyder", filename);
 	ret = isc_stdio_open(tmp, "r", &fp);
+	if (ret != ISC_R_SUCCESS) {
+		is_secure = 2;
+		(void) snprintf(tmp, len, "%s.certder", filename);
+		ret = isc_stdio_open(tmp, "r", &fp);
+	}
 	if (ret != ISC_R_SUCCESS)
 		log_fatal("can't open '%s': %s", tmp, isc_result_totext(ret));
 	/* isc_file_getsize() is not available in bind9.9 */
@@ -4656,14 +4661,14 @@ get_public_key(const char *filename)
 	if (ret != ISC_R_SUCCESS)
 		log_fatal("can't get the size of '%s': %s",
 			  tmp, isc_result_totext(ret));
-	if (size > PUBLIC_KEY_MAXSIZE)
+	if (size > DER_MAXSIZE)
 		log_fatal("%s is too large (%u > %u)",
-			  tmp, (unsigned)size, PUBLIC_KEY_MAXSIZE);
-	if (!buffer_allocate(&public_key.buffer, (unsigned)size, MDL))
+			  tmp, (unsigned)size, DER_MAXSIZE);
+	if (!buffer_allocate(&der.buffer, (unsigned)size, MDL))
 		log_fatal("No memory for %s (size %u)", tmp, (unsigned)size);
-	public_key.data = public_key.buffer->data;
-	public_key.len = size;
-	ret = isc_stdio_read(public_key.buffer->data, 1, size, fp, NULL);
+	der.data = der.buffer->data;
+	der.len = size;
+	ret = isc_stdio_read(der.buffer->data, 1, size, fp, NULL);
 	(void) isc_stdio_close(fp);
 	if (ret != ISC_R_SUCCESS)
 		log_fatal("can't read '%s': %s", tmp, isc_result_totext(ret));
