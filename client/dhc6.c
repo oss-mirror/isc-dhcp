@@ -5173,7 +5173,10 @@ static void
 secure_dhc6_add(struct data_string *packet)
 {
 	struct data_string tbs;
+	struct data_string tmstmp;
 	struct data_string sign;
+	isc_uint64_t sec;
+	isc_uint64_t fraction;
 	dst_context_t *ctx = NULL;
 	isc_region_t r;
 	isc_buffer_t sigbuf;
@@ -5183,6 +5186,7 @@ secure_dhc6_add(struct data_string *packet)
 
 	/* Prepare a to be signed copy of the packet */
 	memset(&tbs, 0, sizeof(tbs));
+	memset(&tmstmp, 0, sizeof(tmstmp));
 	memset(&sign, 0, sizeof(sign));
 	if (!buffer_allocate(&tbs.buffer, packet->len, MDL)) {
 		log_error("Unable to allocate memory for to be signed.");
@@ -5200,16 +5204,44 @@ secure_dhc6_add(struct data_string *packet)
 		return;
 	}
 
+	/* Prepare the timestamp option */
+	if (!buffer_allocate(&tmstmp.buffer, 8, MDL)) {
+		log_error("Unable to allocate memory for timestamp.");
+		data_string_forget(&tbs, MDL);
+		return;
+	}
+	tmstmp.data = tmstmp.buffer->data;
+	tmstmp.len = 8;
+	sec = (isc_uint64_t) cur_tv.tv_sec + 2208988800UL;
+	tmstmp.buffer->data[0] = (sec >> 40) & 0xff;
+	tmstmp.buffer->data[1] = (sec >> 32) & 0xff;
+	tmstmp.buffer->data[2] = (sec >> 24) & 0xff;
+	tmstmp.buffer->data[3] = (sec >> 16) & 0xff;
+	tmstmp.buffer->data[4] = (sec >> 8) & 0xff;
+	tmstmp.buffer->data[5] = sec & 0xff;
+	fraction = (((isc_uint64_t) cur_tv.tv_usec) * 65536) / 1000000;
+	tmstmp.buffer->data[6] = (fraction >> 8) & 0xff;
+	tmstmp.buffer->data[7] = fraction & 0xff;
+
+	/* Push the timestamp option */
+	if (!append_option(&tbs, &dhcpv6_universe, timestmp_option, &tmstmp)) {
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
+		return;
+	}
+
 	/* Prepare the signature option */
 	result = dst_key_sigsize(key, &siglen);
 	if (result != ISC_R_SUCCESS) {
 		log_error("dst_key_sigsize: %s.", isc_result_totext(result));
 		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
 		return;
 	}
 	if (!buffer_allocate(&sign.buffer, siglen, MDL)) {
 		log_error("Unable to allocate memory for signature.");
 		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
 		return;
 	}
 	memset(sign.buffer->data, 0, siglen + 2);
@@ -5222,6 +5254,7 @@ secure_dhc6_add(struct data_string *packet)
 	/* Push the signature on the to be signed copy */
 	if (!append_option(&tbs, &dhcpv6_universe, sign_option, &sign)) {
 		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		return;
 	}
@@ -5232,6 +5265,7 @@ secure_dhc6_add(struct data_string *packet)
 		log_error("dst_context_create: %s.",
 			  isc_result_totext(result));
 		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		return;
 	}
@@ -5244,6 +5278,7 @@ secure_dhc6_add(struct data_string *packet)
 		log_error("dst_context_adddata: %s.",
 			  isc_result_totext(result));
 		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		dst_context_destroy(&ctx);
 		return;
@@ -5257,6 +5292,7 @@ secure_dhc6_add(struct data_string *packet)
 	if (result != ISC_R_SUCCESS) {
 		log_error("dst_context_sign: %s.",
 			  isc_result_totext(result));
+		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		return;
 	}
@@ -5265,9 +5301,19 @@ secure_dhc6_add(struct data_string *packet)
 	if (!append_option(packet, &dhcpv6_universe,
 			   is_secure == 1 ? pubkey_option : cert_option,
 			   &der)) {
+		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		return;
 	}
+
+	/* Push the timestamp option on the packet */
+	if (!append_option(packet, &dhcpv6_universe,
+			   timestmp_option, &tmstmp)) {
+		data_string_forget(&tmstmp, MDL);
+		data_string_forget(&sign, MDL);
+		return;
+	}
+	data_string_forget(&tmstmp, MDL);
 
 	/* Push the final signature on the packet */
 	if (!append_option(packet, &dhcpv6_universe, sign_option, &sign)) {
