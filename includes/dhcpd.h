@@ -2805,7 +2805,7 @@ extern struct client_config top_level_config;
 
 extern int is_secure;
 
-extern dst_key_t *key;
+extern void *key;
 extern struct data_string der;
 
 void dhcpoffer (struct packet *);

@@ -27,8 +27,7 @@ include ./bindvar.tmp
 bindsrcdir=bind-${version}
 
 bindconfig = --disable-kqueue --disable-epoll --disable-devpoll \
-	--with-openssl=/usr/local/opt/openssl \
-	--without-libxml2 --enable-exportlib \
+	--without-openssl --without-libxml2 --enable-exportlib \
 	--with-gssapi=no --enable-threads=no @BINDCONFIG@ \
 	--with-export-includedir=${binddir}/include \
 	--with-export-libdir=${binddir}/lib

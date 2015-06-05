@@ -91,9 +91,9 @@ int wanted_ia_pd = 0;
 char *mockup_relay = NULL;
 
 int is_secure = 0;
-dst_key_t *key = NULL;
+void *key = NULL;
 struct data_string der;
-const char *path_keys = NULL;
+const char *keys_root_name = NULL;
 
 char *progname = NULL;
 
@@ -109,7 +109,7 @@ static int check_domain_name_list(const char *ptr, size_t len, int dots);
 static int check_option_values(struct universe *universe, unsigned int opt,
 			       const char *ptr, size_t len);
 #ifdef DHCPv6
-static void get_der(const char *filename);
+extern void get_keys(const char *rootname);
 #endif
 
 #ifndef UNIT_TEST
@@ -323,7 +323,7 @@ main(int argc, char **argv) {
 			local_family_set = 1;
 			local_family = AF_INET6;
 			is_secure = 1;
-			path_keys = argv[i];
+			keys_root_name = argv[i];
 #endif /* DHCPv6 */
 		} else if (!strcmp(argv[i], "-D")) {
 			duid_v4 = 1;
@@ -410,20 +410,8 @@ main(int argc, char **argv) {
 #ifdef DHCPv6
 	else if (local_family == AF_INET6) {
 		dhcpv6_client_assignments();
-		if (is_secure) {
-			status = dst_key_fromnamedfile(path_keys,
-						       NULL,
-						       DST_TYPE_PRIVATE,
-						       dhcp_gbl_ctx.mctx,
-						       &key);
-			if (status != ISC_R_SUCCESS)
-				log_fatal("dst_key_fromnamedfile: "
-					  "'%s.private': %s",
-					  path_keys,
-					  isc_result_totext(status));
-			/* TODO: check key_alg */
-			get_der(path_keys);
-		}
+		if (is_secure)
+			get_keys(keys_root_name);
 	}
 #endif /* DHCPv6 */
 	else
@@ -793,7 +781,7 @@ static void usage()
 	log_fatal("Usage: %s "
 #ifdef DHCPv6
 		  "[-4|-6] [-SNTPI1dvrxi] [-nw] [-p <port>] [-D LL|LLT] \n"
-		  "                [-k keys-rootname]\n"
+		  "                [-k <keys-rootname>]\n"
 #else /* DHCPv6 */
 		  "[-I1dvrxi] [-nw] [-p <port>] [-D LL|LLT] \n"
 #endif /* DHCPv6 */
@@ -4629,48 +4617,3 @@ add_reject(struct packet *packet) {
 	 */
 	log_info("Server added to list of rejected servers.");
 }
-
-#ifdef DHCPv6
-
-#define DER_MAXSIZE	16*1024U
-
-static void
-get_der(const char *filename)
-{
-	size_t len = strlen(filename);
-	char *tmp;
-	FILE *fp = NULL;
-	isc_result_t ret;
-	off_t size = 0;
-
-	len += 20;
-	tmp = dmalloc(len, MDL);
-	if (!tmp)
-		log_fatal("No memory for %s", filename);
-	(void) snprintf(tmp, len, "%s.pubkeyder", filename);
-	ret = isc_stdio_open(tmp, "r", &fp);
-	if (ret != ISC_R_SUCCESS) {
-		is_secure = 2;
-		(void) snprintf(tmp, len, "%s.certder", filename);
-		ret = isc_stdio_open(tmp, "r", &fp);
-	}
-	if (ret != ISC_R_SUCCESS)
-		log_fatal("can't open '%s': %s", tmp, isc_result_totext(ret));
-	/* isc_file_getsize() is not available in bind9.9 */
-	ret = isc_file_getsizefd(fileno(fp), &size);
-	if (ret != ISC_R_SUCCESS)
-		log_fatal("can't get the size of '%s': %s",
-			  tmp, isc_result_totext(ret));
-	if (size > DER_MAXSIZE)
-		log_fatal("%s is too large (%u > %u)",
-			  tmp, (unsigned)size, DER_MAXSIZE);
-	if (!buffer_allocate(&der.buffer, (unsigned)size, MDL))
-		log_fatal("No memory for %s (size %u)", tmp, (unsigned)size);
-	der.data = der.buffer->data;
-	der.len = size;
-	ret = isc_stdio_read(der.buffer->data, 1, size, fp, NULL);
-	(void) isc_stdio_close(fp);
-	if (ret != ISC_R_SUCCESS)
-		log_fatal("can't read '%s': %s", tmp, isc_result_totext(ret));
-}
-#endif /* DHCPv6 */

@@ -349,13 +349,13 @@ Use the standard DDNS scheme from RFCs 4701 & 4702.
 .TP
 .TP
 .BI \-k \ keys-rootname
-Specify the rootname of key files for secure DHCPv6 (so requires \fB-6\fR).
-The public key must be in \fIrootname.key\fR, the private key in
-\fIrootname.private\fR, both in DNSSEC format for RSASHA256 or
-RSASHA512. The third file is used for the public key or the certificate
-secure DHCPv6 option, must be in DER format and the name is
-\fIrootname.pubkeyder\fR for a public key (SubjectPublicKeyInfo) and
-\fIrootname.certder\fR for a certificate (X.509 public key certificate).
+Specify the rootname of PEM key files for secure DHCPv6 (so requires \fB-6\fR).
+Suffixes are \fI.pkcs8\fR or \fI.priv\fR for the mandatory private key
+in PKCS#8 or PKCS#1 format, \fI.spki\fR for the public key in
+SubjectPublicKeyInfo (SPKI) format or \fI.pub\fR inPKCS#1 format,
+or \fI.x509\fR or \fI.cert\fR for the X.509 public key certificate.
+The public key or certificate file is used to build the corresponding
+(and mandatory) secure DHCPv6 option.
 .TP
 .BI \--version
 Print version number and exit.

@@ -5239,14 +5239,12 @@ secure_dhc6_add(struct data_string *packet)
 	struct data_string tbs;
 	struct data_string tmstmp;
 	struct data_string sign;
+	EVP_MD_CTX ctx;
+	EVP_PKEY *pkey = (EVP_PKEY *) key;
 	isc_uint64_t sec;
 	isc_uint64_t fraction;
-	dst_context_t *ctx = NULL;
-	isc_region_t r;
-	isc_buffer_t sigbuf;
-	unsigned int siglen = 0;
-	int savedlen = (int) packet->len;
-	isc_result_t result;
+	int siglen, savedlen = (int) packet->len;
+	unsigned size;
 
 	/* Prepare a to be signed copy of the packet */
 	memset(&tbs, 0, sizeof(tbs));
@@ -5295,22 +5293,23 @@ secure_dhc6_add(struct data_string *packet)
 	}
 
 	/* Prepare the signature option */
-	result = dst_key_sigsize(key, &siglen);
-	if (result != ISC_R_SUCCESS) {
-		log_error("dst_key_sigsize: %s.", isc_result_totext(result));
+	siglen = EVP_PKEY_size(pkey);
+	if (siglen <= 0) {
+		log_error("EVP_PKEY_size failed");
 		data_string_forget(&tbs, MDL);
 		data_string_forget(&tmstmp, MDL);
 		return;
 	}
-	if (!buffer_allocate(&sign.buffer, siglen, MDL)) {
+	size = (unsigned) siglen;
+	if (!buffer_allocate(&sign.buffer, size, MDL)) {
 		log_error("Unable to allocate memory for signature.");
 		data_string_forget(&tbs, MDL);
 		data_string_forget(&tmstmp, MDL);
 		return;
 	}
-	memset(sign.buffer->data, 0, siglen + 2);
+	memset(sign.buffer->data, 0, size + 2);
 	sign.data = sign.buffer->data;
-	sign.len = siglen + 2;
+	sign.len = size + 2;
 	/* TODO: map algos */
 	sign.buffer->data[0] = SHA_256;
 	sign.buffer->data[1] = RSASSA_PKCS1v1_5;
@@ -5323,43 +5322,32 @@ secure_dhc6_add(struct data_string *packet)
 		return;
 	}
 
-	/* Get a signing context */
-	result = dst_context_create(key, dhcp_gbl_ctx.mctx, &ctx);
-	if (result != ISC_R_SUCCESS) {
-		log_error("dst_context_create: %s.",
-			  isc_result_totext(result));
-		data_string_forget(&tbs, MDL);
-		data_string_forget(&tmstmp, MDL);
-		data_string_forget(&sign, MDL);
-		return;
-	}
-
-	/* Digest the to be signed copy */
-	r.base = tbs.buffer->data;
-	r.length = tbs.len;
-	result = dst_context_adddata(ctx, &r);
-	if (result != ISC_R_SUCCESS) {
-		log_error("dst_context_adddata: %s.",
-			  isc_result_totext(result));
-		data_string_forget(&tbs, MDL);
-		data_string_forget(&tmstmp, MDL);
-		data_string_forget(&sign, MDL);
-		dst_context_destroy(&ctx);
-		return;
-	}
-
 	/* Sign */
-	isc_buffer_init(&sigbuf, &sign.buffer->data[2], siglen);
-	result = dst_context_sign(ctx, &sigbuf);
-	data_string_forget(&tbs, MDL);
-	dst_context_destroy(&ctx);
-	if (result != ISC_R_SUCCESS) {
-		log_error("dst_context_sign: %s.",
-			  isc_result_totext(result));
+	EVP_MD_CTX_init(&ctx);
+	if (!EVP_DigestInit_ex(&ctx, EVP_sha256(), NULL)) {
+		log_error("EVP_DigestInit_ex failed");
+		data_string_forget(&tbs, MDL);
 		data_string_forget(&tmstmp, MDL);
 		data_string_forget(&sign, MDL);
 		return;
 	}
+	if (!EVP_DigestUpdate(&ctx, tbs.data, tbs.len)) {
+		log_error("EVP_DigestUpdate failed");
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
+		data_string_forget(&sign, MDL);
+		return;
+	}
+	if (!EVP_SignFinal(&ctx, sign.buffer->data + 2, &size, pkey)) {
+		log_error("EVP_SignFinal failed");
+		data_string_forget(&tbs, MDL);
+		data_string_forget(&tmstmp, MDL);
+		data_string_forget(&sign, MDL);
+		EVP_MD_CTX_cleanup(&ctx);
+		return;
+	}
+	data_string_forget(&tbs, MDL);
+	EVP_MD_CTX_cleanup(&ctx);
 
 	/* Push the public key/certificate option on the packet */
 	if (!append_option(packet, &dhcpv6_universe,
@@ -5631,5 +5619,129 @@ valid_secure_dhc6(struct packet *packet)
 
 	log_info("signature is valid.");
 	return ISC_TRUE;
+}
+
+#define DER_MAXSIZE	16*1024
+
+void
+get_keys(const char *rootname)
+{
+
+	char *tmp;
+	FILE *fp = NULL;
+	EVP_PKEY *pkey = (EVP_PKEY *) key;
+	EVP_PKEY *pubkey;
+	RSA *rsa;
+	X509 *x509;
+	size_t nlen = strlen(rootname);
+	isc_result_t ret;
+	int len, nid;
+	unsigned char *p;
+
+	nlen += 20;
+	tmp = dmalloc(nlen, MDL);
+	if (!tmp)
+		log_fatal("No memory for %s", rootname);
+
+	/* Get the private key - PKCS#1 or PKCS#8 format. */
+	(void) snprintf(tmp, nlen, "%s.pkcs8", rootname);
+	ret = isc_stdio_open(tmp, "r", &fp);
+	if (ret != ISC_R_SUCCESS) {
+		(void) snprintf(tmp, nlen, "%s.priv", rootname);
+		ret = isc_stdio_open(tmp, "r", &fp);
+	}
+	if (ret != ISC_R_SUCCESS)
+		log_fatal("can't open '%s': %s", tmp, isc_result_totext(ret));
+	pkey = PEM_read_PrivateKey(fp, NULL, 0, NULL);
+	fclose(fp);
+	if (!pkey)
+		log_fatal("PEM_read_PrivateKey() failed");
+	key = (void *) pkey;
+
+	/* Get the public key - PKCS#1 format. */
+	(void) snprintf(tmp, nlen, "%s.pub", rootname);
+	ret = isc_stdio_open(tmp, "r", &fp);
+	if (ret != ISC_R_SUCCESS)
+		goto spki;
+	rsa = PEM_read_RSAPublicKey(fp, NULL, 0, NULL);
+	fclose(fp);
+	if (!rsa)
+		log_fatal("PEM_read_RSAPublicKey failed");
+	goto der;
+
+    spki:
+	/* Get the public key - SPKI format. */
+	(void) snprintf(tmp, nlen, "%s.spki", rootname);
+	ret = isc_stdio_open(tmp, "r", &fp);
+	if (ret != ISC_R_SUCCESS)
+		goto cert;
+	pubkey = PEM_read_PUBKEY(fp, NULL, 0, NULL);
+	fclose(fp);
+	if (!pubkey)
+		log_fatal("PEM_read_PUBKEY failed");
+	rsa = EVP_PKEY_get1_RSA(pubkey);
+	if (!rsa)
+		log_fatal("EVP_PKEY_get1_RSA failed");
+	EVP_PKEY_free(pubkey);
+
+    der:
+	/* Put the public key in SPKI DER format in the der data string. */
+	len = i2d_RSA_PUBKEY(rsa, NULL);
+	if (len < 0)
+		log_fatal("i2d_RSA_PUBKEY failed0");
+	if (len > DER_MAXSIZE)
+		log_fatal("the public key is too large (size %d)", len);
+	if (!buffer_allocate(&der.buffer, (unsigned)len, MDL))
+		log_fatal("No memory for the public key in DER (size %u)",
+			  (unsigned)len);
+	der.data = der.buffer->data;
+	der.len = (unsigned)len;
+	p = der.buffer->data;
+	len = i2d_RSA_PUBKEY(rsa, &p);
+	if (len != (int)der.len)
+		log_fatal("i2d_RSA_PUBKEY failed");
+	RSA_free(rsa);
+	dfree(tmp, MDL);
+	return;
+
+    cert:
+	/* Get the X.509 public key certificate. */
+	is_secure = 2;
+	(void) snprintf(tmp, nlen, "%s.x509", rootname);
+	ret = isc_stdio_open(tmp, "r", &fp);
+	if (ret != ISC_R_SUCCESS) {
+		(void) snprintf(tmp, nlen, "%s.cert", rootname);
+		ret = isc_stdio_open(tmp, "r", &fp);
+	}
+	if (ret != ISC_R_SUCCESS)
+		log_fatal("can't open '%s': %s", tmp, isc_result_totext(ret));
+	x509 = PEM_read_X509(fp, NULL, 0, NULL);
+	fclose(fp);
+	if (!x509)
+		log_fatal("PEM_read_X509 failed");
+	/* Verify it is RSASHA256. */
+	nid = OBJ_obj2nid(x509->sig_alg->algorithm);
+	/* SHA-512 is .13 */
+	if (nid != OBJ_txt2nid("1.2.840.113549.1.1.11"))
+		log_fatal("The certificate is not for RSASHA256");
+	
+	/* Put the certificate in DER format in the der data string. */
+	len = i2d_X509(x509, NULL);
+	if (len < 0)
+		log_fatal("i2d_X509 failed0");
+	if (len > DER_MAXSIZE)
+		log_fatal("the certificate is too large (size %d)", len);
+	if (!buffer_allocate(&der.buffer, (unsigned)len, MDL))
+		log_fatal("No memory for the certificate in DER (size %u)",
+			  (unsigned)len);
+	der.data = der.buffer->data;
+	der.len = (unsigned)len;
+	p = der.buffer->data;
+	len = i2d_X509(x509, &p);
+	if (len != (int)der.len)
+		log_fatal("i2d_X509 failed");
+	X509_free(x509);
+	dfree(tmp, MDL);
+	return;
 }
 #endif /* DHCPv6 */
