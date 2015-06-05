@@ -578,6 +578,13 @@ struct enumeration_value dhcpv6_status_code_values[] = {
 	{ "MalformedQuery", 8 }, /* Leasequery not valid.		*/
 	{ "NotConfigured", 9 }, /* The target address is not in config.	*/
 	{ "NotAllowed",  10 }, /* Server doesn't allow the leasequery.	*/
+#if 0
+	/* secure DHCPv6 (not 8 bit large) */
+	{ "AlgorithmNotSupported", 705 }, /* Algorithm not supported.	*/
+	{ "AuthenticationFail", 706 }, /* Authentication failed.	*/
+	{ "TimestampFail", 707 }, /* Timestamp check failed.		*/
+	{ "SignatureFail", 708 }, /* Signature verify failed.		*/
+#endif
 	{ NULL, 0 }
 };
 

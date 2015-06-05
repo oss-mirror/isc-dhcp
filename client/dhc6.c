@@ -24,6 +24,9 @@
  */
 
 #include "dhcpd.h"
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
 
 #ifdef DHCPv6
 
@@ -120,6 +123,7 @@ static int check_timing6(struct client_state *client, u_int8_t msg_type,
 		         char *msg_str, struct dhc6_lease *lease,
 		         struct data_string *ds);
 static void secure_dhc6_add(struct data_string *packet);
+static int valid_secure_dhc6(struct packet *packet);
 
 extern int onetry;
 extern int stateless;
@@ -2217,6 +2221,38 @@ status_log(int code, const char *scope, const char *additional, int len)
 		msg = "NoPrefixAvail";
 		break;
 
+	      case STATUS_UnknownQueryType:
+		msg = "UnknownQueryType";
+		break;
+
+	      case STATUS_MalformedQuery:
+		msg = "MalformedQuery";
+		break;
+
+	      case STATUS_NotConfigured:
+		msg = "NotConfigured";
+		break;
+
+	      case STATUS_NotAllowed:
+		msg = "NotAllowed";
+		break;
+
+	      case STATUS_AlgorithmNotSupported:
+		msg = "AlgorithmNotSupported";
+		break;
+
+	      case STATUS_AuthenticationFail:
+		msg = "AuthenticationFail";
+		break;
+
+	      case STATUS_TimestampFail:
+		msg = "TimestampFail";
+		break;
+
+	      case STATUS_SignatureFail:
+		msg = "SignatureFail";
+		break;
+
 	      default:
 		msg = "UNKNOWN";
 		break;
@@ -2842,6 +2878,13 @@ init_handler(struct packet *packet, struct client_state *client)
 		return;
 	}
 
+	/* Process secure DHCPv6 options.
+	 */
+	if (!valid_secure_dhc6(packet)) {
+		log_error("Bad secure Advertise - rejecting.");
+		return;
+	}
+
 	lease = dhc6_leaseify(packet);
 
 	if (dhc6_check_advertise(lease) != ISC_R_SUCCESS) {
@@ -2888,6 +2931,13 @@ info_request_handler(struct packet *packet, struct client_state *client)
 	 */
 	if (!valid_reply(packet, client)) {
 		log_error("Invalid Reply - rejecting.");
+		return;
+	}
+
+	/* Process secure DHCPv6 options.
+	 */
+	if (!valid_secure_dhc6(packet)) {
+		log_error("Bad secure Reply - rejecting.");
 		return;
 	}
 
@@ -2949,6 +2999,13 @@ rapid_commit_handler(struct packet *packet, struct client_state *client)
 	 */
 	if (!valid_reply(packet, client)) {
 		log_error("Invalid Reply - rejecting.");
+		return;
+	}
+
+	/* Process secure DHCPv6 options.
+	 */
+	if (!valid_secure_dhc6(packet)) {
+		log_error("Bad secure Reply - rejecting.");
 		return;
 	}
 
@@ -3775,6 +3832,13 @@ reply_handler(struct packet *packet, struct client_state *client)
 	 */
 	if (!valid_reply(packet, client)) {
 		log_error("Invalid Reply - rejecting.");
+		return;
+	}
+
+	/* Process secure DHCPv6 options.
+	 */
+	if (!valid_secure_dhc6(packet)) {
+		log_error("Bad secure Reply - rejecting.");
 		return;
 	}
 
@@ -5324,5 +5388,248 @@ secure_dhc6_add(struct data_string *packet)
 
 	data_string_forget(&sign, MDL);
 	return;
+}
+
+static int
+valid_secure_dhc6(struct packet *packet)
+{
+	struct data_string cred;
+	struct data_string sign;
+	struct data_string tmstmp;
+	struct data_string tbs;
+	struct option_cache *oc;
+	unsigned cred_code = D6O_PUBLIC_KEY;
+	char *cred_name = "public key";
+	unsigned len, offset;
+	EVP_PKEY *pkey;
+	RSA *rsa;
+	EVP_MD_CTX ctx;
+	const unsigned char *p;
+	int status;
+
+	memset(&cred, 0, sizeof(cred));
+	memset(&sign, 0, sizeof(sign));
+	memset(&tmstmp, 0, sizeof(tmstmp));
+	memset(&tbs, 0, sizeof(tbs));
+
+	/* Get the credential (public key or certificate) option. */
+	oc = lookup_option(&dhcpv6_universe, packet->options, cred_code);
+	if (!oc) {
+		cred_code = D6O_CERTIFICATE;
+		cred_name = "certificate";
+		oc = lookup_option(&dhcpv6_universe, packet->options,
+				   cred_code);
+	}
+	if (!oc) {
+		if (is_secure) {
+			log_error("Can't find a public key or "
+				  "certificate option.");
+			return ISC_FALSE;
+		}
+		log_debug("No public key or certificate option.");
+		return ISC_TRUE;
+	}
+	if (!evaluate_option_cache(&cred, packet, NULL, NULL,
+				   packet->options, NULL, NULL,
+				   oc, MDL)) {
+		log_error("Can't get the %s option.", cred_name);
+		return ISC_FALSE;
+	}
+	log_debug("RCV:  %s option (size %u)", cred_name, cred.len);
+
+	/* TODO: support certificates. */
+	if (cred_code == D6O_CERTIFICATE) {
+		data_string_forget(&cred, MDL);
+		if (is_secure) {
+			log_error("Certificates are not yet supported.");
+			return ISC_FALSE;
+		}
+		log_debug("Certificates are not yet supported.");
+		return ISC_TRUE;
+	}
+
+	/* Get the signature option. */
+	oc = lookup_option(&dhcpv6_universe, packet->options, D6O_SIGNATURE);
+	if (!oc) {
+		data_string_forget(&cred, MDL);
+		if (is_secure) {
+			log_error("Can't find the signature option.");
+			return ISC_FALSE;
+		}
+		log_debug("No signature option.");
+		return ISC_TRUE;
+	}
+	if (!evaluate_option_cache(&sign, packet, NULL, NULL,
+				   packet->options, NULL, NULL,
+				   oc, MDL) || (sign.len <= 2)) {
+		data_string_forget(&cred, MDL);
+		data_string_forget(&sign, MDL);
+		log_error("Can't get the signature option.");
+		return ISC_FALSE;
+	}
+	log_debug("RCV:  signature option (size %u)", sign.len);
+
+	/* TODO: support SHA_512 */
+	if ((sign.data[0] != SHA_256) || (sign.data[1] != RSASSA_PKCS1v1_5)) {
+		data_string_forget(&cred, MDL);
+		log_error("Unsupported signature algos (%u,%u).",
+			  (unsigned) sign.data[0], (unsigned) sign.data[1]);
+		data_string_forget(&sign, MDL);
+		return ISC_FALSE;
+	}
+
+	/* Get the timestamp option. */
+	oc = lookup_option(&dhcpv6_universe, packet->options, D6O_TIMESTAMP);
+	if (oc) {
+		if (!evaluate_option_cache(&tmstmp, packet, NULL, NULL,
+					   packet->options, NULL, NULL,
+					   oc, MDL))
+			log_debug("Can't get the timestamp option.");
+		else if (tmstmp.len != 8)
+			log_debug("Malformed timestamp option.");
+		else {
+			isc_uint64_t sec;
+			isc_uint16_t fraction;
+			time_t t;
+			struct tm *tm;
+			char tbuf[32];
+			unsigned ms;
+
+			sec = tmstmp.data[0];
+			sec <<= 8;
+			sec |= tmstmp.data[1];
+			sec <<= 8;
+			sec |= tmstmp.data[2];
+			sec <<= 8;
+			sec |= tmstmp.data[3];
+			sec <<= 8;
+			sec |= tmstmp.data[4];
+			sec <<= 8;
+			sec |= tmstmp.data[5];
+			fraction = tmstmp.data[6];
+			fraction <<= 8;
+			fraction |= tmstmp.data[7];
+			t = (time_t)(sec - 2208988800ULL);
+			tm = gmtime(&t);
+			ms = (fraction * 1000U) / 65536U;
+			strftime(tbuf, sizeof(tbuf), "%Y/%m/%d %H:%M:%S", tm);
+			log_debug("RCV:  timestamp option (%s.%03u)",
+				  tbuf, ms);
+			data_string_forget(&tmstmp, MDL);
+		}
+	}
+
+	/* Prepare verify. */
+	if (!buffer_allocate(&tbs.buffer, packet->packet_length, MDL)) {
+		data_string_forget(&cred, MDL);
+		data_string_forget(&sign, MDL);
+		log_error("Unable to allocate memory for to be signed.");
+		return ISC_FALSE;
+	}
+	tbs.data = tbs.buffer->data;
+	tbs.len = len = packet->packet_length;
+	memcpy(tbs.buffer->data, packet->raw, len);
+
+	/* Dig for the signature in to be signed. */
+	offset = 4;
+	while (offset + 4 <= len) {
+		unsigned optcode, optlen;
+
+		optcode = getUShort(tbs.data + offset);
+		offset += 2;
+		optlen = getUShort(tbs.data + offset);
+		offset += 2;
+		if (offset + optlen > len) {
+			log_debug("overflow option?!");
+			offset = 0;
+			break;
+		}
+		if (optcode != D6O_SIGNATURE) {
+			offset += optlen;
+			continue;
+		}
+		if (optlen <= 2) {
+			log_debug("malformed signature option?!");
+			break;
+		}
+		offset += 2;
+		optlen -= 2;
+		memset(tbs.buffer->data + offset, 0, optlen);
+		break;
+	}
+	if (offset == 0) {
+		data_string_forget(&cred, MDL);
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		log_error("Can't build to be signed.");
+		return ISC_FALSE;
+	}
+
+	/* Get the public key from the option. */
+	p = cred.data;
+	rsa = d2i_RSA_PUBKEY(NULL, &p, (long) cred.len);
+	data_string_forget(&cred, MDL);
+	if (!rsa) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		log_error("d2i_RSA_PUBKEY() failed.");
+		return ISC_FALSE;
+	}
+	pkey = EVP_PKEY_new();
+	if (!pkey) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		RSA_free(rsa);
+		log_error("EVP_PKEY_new() failed.");
+		return ISC_FALSE;
+	}
+	if (!EVP_PKEY_set1_RSA(pkey, rsa)) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
+		log_error("EVP_PKEY_set1_RSA failed.");
+		return ISC_FALSE;
+	}
+	RSA_free(rsa);
+	len = EVP_PKEY_size(pkey);
+	if (sign.len - 2 < len) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		EVP_PKEY_free(pkey);
+		log_error("signature option is too short by %d.",
+			  len + 2 - sign.len);
+		return ISC_FALSE;
+	}
+	EVP_MD_CTX_init(&ctx);
+	if (!EVP_DigestInit_ex(&ctx, EVP_sha256(), NULL)) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		EVP_PKEY_free(pkey);
+		log_error("EVP_DigestInit_ex() failed.");
+		return ISC_FALSE;
+	}
+	if (!EVP_DigestUpdate(&ctx, tbs.data, tbs.len)) {
+		data_string_forget(&sign, MDL);
+		data_string_forget(&tbs, MDL);
+		EVP_PKEY_free(pkey);
+		log_error("EVP_DigestUpdate() failed.");
+		return ISC_FALSE;
+	}
+	status = EVP_VerifyFinal(&ctx, sign.data + 2, len, pkey);
+	EVP_MD_CTX_cleanup(&ctx);
+	EVP_PKEY_free(pkey);
+	data_string_forget(&sign, MDL);
+	data_string_forget(&tbs, MDL);
+	if (status < 0) {
+		log_error("EVP_VerifyFinal() failed.");
+		return ISC_FALSE;
+	} else if (status == 0) {
+		log_error("signature is not valid.");
+		return ISC_FALSE;
+	}
+
+	log_info("signature is valid.");
+	return ISC_TRUE;
 }
 #endif /* DHCPv6 */
