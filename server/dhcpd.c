@@ -169,7 +169,7 @@ usage(const char *sfmt, const char *sarg) {
 	log_fatal("Usage: %s [-p <UDP port #>] [-f] [-d] [-q] [-t|-T]\n"
 #ifdef DHCPv6
 #ifdef DHCP4o6
-		  "             [-4|6] [-4o6 <port>]\n"
+		  "             [-4|-6] [-4o6 <port>]\n"
 		  "             [-cf config-file] [-lf lease-file]\n"
 #else /* DHCP4o6 */
 		  "             [-4|-6] [-cf config-file] [-lf lease-file]\n"
@@ -445,7 +445,7 @@ main(int argc, char **argv) {
 				  "with DHPv4 over DHCPv6 [-4|-6].");
 		if ((local_family == AF_INET) && (interfaces != NULL))
 			log_fatal("DHCPv4 server in DHPv4 over DHCPv6 "
-				  "mode with specified (by command line) "
+				  "mode with command line specified "
 				  "interfaces.");
 	}
 #endif /* DHCPv6 && DHCP4o6 */
@@ -716,7 +716,7 @@ main(int argc, char **argv) {
 	if (dhcpv4_over_dhcpv6) {
 		if ((local_family == AF_INET) && (interfaces != NULL))
 			log_fatal("DHCPv4 server in DHPv4 over DHCPv6 "
-				  "mode with specified (by config file) "
+				  "mode with config file specified "
 				  "interfaces.");
 	}
 #endif /* DHCPv6 && DHCP4o6 */

@@ -230,7 +230,7 @@ isc_result_t dhcpv4o6_handler(omapi_object_t *h) {
 }
 
 /*
- * DHCPv6 server function: send the DHCPv4-response back DHCPv6 client.
+ * DHCPv6 server function: send the DHCPv4-response back to the DHCPv6 client.
  * Format: interface:16 + address:16 + DHCPv6 DHCPv4-response message
  */
 

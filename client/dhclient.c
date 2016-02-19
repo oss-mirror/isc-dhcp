@@ -475,7 +475,7 @@ main(int argc, char **argv) {
 	if ((local_family == AF_INET) && dhcpv4_over_dhcpv6 &&
 	    (interfaces_requested != 1))
 		log_fatal("DHCPv4-over-DHCPv6 requires an explicit "
-			  "interface where to be applied");
+			  "interface on which to be applied");
 #endif
 
 	if (!no_dhclient_conf && (s = getenv("PATH_DHCLIENT_CONF"))) {

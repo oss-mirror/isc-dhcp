@@ -213,8 +213,8 @@ Run as a DHCP server. This is the default and cannot be combined with
 Run as a DHCPv6 server. This cannot be combined with \fB\-4\fR.
 .TP
 .BI \-4o6 \ port
-Participate to the DHCPv4 over DHCPv6 protocol specified by RFC 7341.
-This associates a DHCPv4 and a DHCPv6 server  to allow the v4 server to
+Participate in the DHCPv4 over DHCPv6 protocol specified by RFC 7341.
+This associates a DHCPv4 and a DHCPv6 server to allow the v4 server to
 receive v4 requests that were encapsualted in a v6 packet.  Communication
 between the two servers is done on a pair of UDP sockets bound
 to ::1 \fIport\fR and \fIport + 1\fR. Both servers must

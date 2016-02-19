@@ -1,5 +1,7 @@
 Short notice about DHCPv4 over DHCPv6 aka RFC 7341
 --------------------------------------------------
+Note well: this code is still somewhat experimental and any user
+should take care when trying to use it.
 
 First both the DHCPv4 over DHCPv6 client and server come with two
 processes (named "side" below):

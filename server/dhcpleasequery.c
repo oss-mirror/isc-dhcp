@@ -173,9 +173,9 @@ dhcpleasequery(struct packet *packet, int ms_nulltp) {
 	 * We can't reply if there is no giaddr field.
 	 */
 	/*
-	 * Note this makes DHCPv4-over-DHCPv6 to always fail but it should not
-	 * really a problem because it is not a specified (and making sense)
-	 * use case...
+	 * Note: this makes DHCPv4-over-DHCPv6 always fail but it should not
+	 * really be a problem because it is not a specified use case
+	 * (or even one that makes sense).
 	 */
 	if (!packet->raw->giaddr.s_addr) {
 		log_info("%s: missing giaddr, ciaddr is %s, no reply sent", 
