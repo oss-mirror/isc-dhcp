@@ -1805,6 +1805,13 @@ static void recv_dhcpv4_response(struct data_string *raw)
 	packet->client_addr = from;
 	interface_reference(&packet->interface, interfaces, MDL);
 
+	/* Allocate packet->options now so it is non-null for all packets */
+	packet->options_valid = 0;
+	if (!option_state_allocate (&packet->options, MDL)) {
+		log_error("recv_dhcpv4_response: no memory for options.");
+		return;
+	}
+
 	/* If there's an option buffer, try to parse it. */
 	if (packet->packet_length >= DHCP_FIXED_NON_UDP + 4) {
 		struct option_cache *op;

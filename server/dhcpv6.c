@@ -7014,6 +7014,13 @@ dhcp4o6_dhcpv4_query(struct data_string *reply_ret, struct packet *packet) {
 		goto exit;
 	}
 
+	/* Allocate packet->options now so it is non-null for all packets */
+	enc_packet->options_valid = 0;
+	if (!option_state_allocate (&enc_packet->options, MDL)) {
+		log_error("dhcp4o6_dhcpv4_query: no memory for options.");
+		goto exit;
+	}
+
 	/* If there's an option buffer, try to parse it. */
 	if (enc_packet->packet_length >= DHCP_FIXED_NON_UDP + 4) {
 		struct option_cache *op;
