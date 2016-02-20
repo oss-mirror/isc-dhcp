@@ -892,12 +892,6 @@ void run_stateless(int exit_mode, u_int16_t port)
 		usage("No interfaces available for stateless command: %s", "-S");
 
 	/* Parse the dhclient.conf file. */
-#ifdef DHCP4o6
-	if (dhcpv4_over_dhcpv6) {
-		/* Mark we want to request IRT too! */
-		dhcpv4_over_dhcpv6++;
-	}
-#endif
 	read_client_conf();
 
 	/* Parse the lease database. */

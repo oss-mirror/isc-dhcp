@@ -233,6 +233,10 @@ by Eric Young (eay@cryptsoft.com).
   Please look at doc/DHCPv4-over-DHCPv6 for more details.
   [ISC-Bugs #35711]
 
+- Add the IRT (Information Refresh Time) option to the default requested
+  option list of the DHCPv6 stateless client.
+  [ISC-Bugs #41750]
+
 			Changes since 4.3.3b1
 
 - None

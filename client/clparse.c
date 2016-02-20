@@ -31,9 +31,8 @@
 
 struct client_config top_level_config;
 
-#define NUM_DEFAULT_REQUESTED_OPTS	9
-/* There can be 2 extra requested options for DHCPv4-over-DHCPv6. */
-struct option *default_requested_options[NUM_DEFAULT_REQUESTED_OPTS + 2 + 1];
+#define NUM_DEFAULT_REQUESTED_OPTS	11
+struct option *default_requested_options[NUM_DEFAULT_REQUESTED_OPTS + 1];
 
 static void parse_client_default_duid(struct parse *cfile);
 static void parse_client6_lease_statement(struct parse *cfile);
@@ -44,6 +43,7 @@ static struct dhc6_ia *parse_client6_ia_pd_statement(struct parse *cfile);
 static struct dhc6_addr *parse_client6_iaaddr_statement(struct parse *cfile);
 static struct dhc6_addr *parse_client6_iaprefix_statement(struct parse *cfile);
 #endif /* DHCPv6 */
+extern int stateless;
 
 /* client-conf-file :== client-declarations END_OF_FILE
    client-declarations :== <nil>
@@ -55,6 +55,7 @@ isc_result_t read_client_conf ()
 	struct client_config *config;
 	struct interface_info *ip;
 	isc_result_t status;
+	unsigned last_index;
 	unsigned code;
 
         /* 
@@ -70,94 +71,88 @@ isc_result_t read_client_conf ()
 	memset(default_requested_options, 0, sizeof(default_requested_options));
 
 	/* 1 */
+	last_index = 0;
 	code = DHO_SUBNET_MASK;
-	option_code_hash_lookup(&default_requested_options[0],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 2 */
+	last_index++;
 	code = DHO_BROADCAST_ADDRESS;
-	option_code_hash_lookup(&default_requested_options[1],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 3 */
+	last_index++;
 	code = DHO_TIME_OFFSET;
-	option_code_hash_lookup(&default_requested_options[2],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 4 */
+	last_index++;
 	code = DHO_ROUTERS;
-	option_code_hash_lookup(&default_requested_options[3],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 5 */
+	last_index++;
 	code = DHO_DOMAIN_NAME;
-	option_code_hash_lookup(&default_requested_options[4],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 6 */
+	last_index++;
 	code = DHO_DOMAIN_NAME_SERVERS;
-	option_code_hash_lookup(&default_requested_options[5],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 7 */
+	last_index++;
 	code = DHO_HOST_NAME;
-	option_code_hash_lookup(&default_requested_options[6],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcp_universe.code_hash, &code, 0, MDL);
 
 	/* 8 */
+	last_index++;
 	code = D6O_NAME_SERVERS;
-	option_code_hash_lookup(&default_requested_options[7],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcpv6_universe.code_hash, &code, 0, MDL);
 
 	/* 9 */
+	last_index++;
 	code = D6O_DOMAIN_SEARCH;
-	option_code_hash_lookup(&default_requested_options[8],
+	option_code_hash_lookup(&default_requested_options[last_index],
 				dhcpv6_universe.code_hash, &code, 0, MDL);
 
-	for (code = 0 ; code < NUM_DEFAULT_REQUESTED_OPTS ; code++) {
+	/* Called from run_stateless() so the IRT should be requested */
+	if (stateless) {
+		/* 10 */
+		last_index++;
+		code = D6O_INFORMATION_REFRESH_TIME;
+		option_code_hash_lookup(&default_requested_options[last_index],
+					dhcpv6_universe.code_hash,
+					&code, 0, MDL);
+	}
+
+#ifdef DHCP4o6
+	/* The DHCP4o6 server option should be requested */
+	if (dhcpv4_over_dhcpv6 == 1) {
+		/* 10 or 11 */
+		last_index++;
+		code = D6O_DHCP4_O_DHCP6_SERVER;
+		option_code_hash_lookup(&default_requested_options[last_index],
+					dhcpv6_universe.code_hash,
+					&code, 0, MDL);
+	}
+#endif
+					
+	for (code = 0 ; code <= last_index ; code++) {
 		if (default_requested_options[code] == NULL)
 			log_fatal("Unable to find option definition for "
 				  "index %u during default parameter request "
 				  "assembly.", code);
 	}
 
-#ifdef DHCP4o6
-	/* DHCPv4-over-DHCPv6 extra requested options in code order */
-	if (dhcpv4_over_dhcpv6 == 1) {
-		/* The DHCP4o6 server option should be requested */
-		code = D6O_DHCP4_O_DHCP6_SERVER;
-		option_code_hash_lookup(&default_requested_options[9],
-					dhcpv6_universe.code_hash,
-					&code, 0, MDL);
-		if (default_requested_options[9] == NULL) {
-			log_fatal("Unable to find option definition for "
-				  "index %u during default parameter request "
-				  "assembly.", code);
-		}
-	} else if (dhcpv4_over_dhcpv6 > 1) {
-		/* Called from run_stateless so the IRT should
-		   be requested too */
-		code = D6O_INFORMATION_REFRESH_TIME;
-		option_code_hash_lookup(&default_requested_options[9],
-					dhcpv6_universe.code_hash,
-					&code, 0, MDL);
-		if (default_requested_options[9] == NULL) {
-			log_fatal("Unable to find option definition for "
-				  "index %u during default parameter request "
-				  "assembly.", code);
-		}
-		code = D6O_DHCP4_O_DHCP6_SERVER;
-		option_code_hash_lookup(&default_requested_options[10],
-					dhcpv6_universe.code_hash,
-					&code, 0, MDL);
-		if (default_requested_options[10] == NULL) {
-			log_fatal("Unable to find option definition for "
-				  "index %u during default parameter request "
-				  "assembly.", code);
-		}
-	}
-#endif
-					
 	/* Initialize the top level client configuration. */
 	memset (&top_level_config, 0, sizeof top_level_config);
 
