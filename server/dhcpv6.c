@@ -178,7 +178,15 @@ set_reply_tee_times(struct reply_state* reply, unsigned ia_cursor);
 
 #ifdef DHCP4o6
 /*
- * Omapi I/O handler.
+ * \brief Omapi I/O handler
+ *
+ * The inter-process communication receive handler.
+ * Get the message, put it into the raw data_string
+ * and call \ref send_dhcpv4_response() (DHCPv6 side) or
+ * \ref recv_dhcpv4_query() (DHCPv4 side)
+ *
+ * \param h the OMAPI object
+ * \return a result for I/O success or error (used by the I/O subsystem)
  */
 isc_result_t dhcpv4o6_handler(omapi_object_t *h) {
 	char buf[65536];
@@ -189,51 +197,37 @@ isc_result_t dhcpv4o6_handler(omapi_object_t *h) {
 		return DHCP_R_INVALIDARG;
 
 	cc = recv(dhcp4o6_fd, buf, sizeof(buf), 0);
-	if (cc <= 0)
+
+	if (cc < DHCP_FIXED_NON_UDP + 32)
 		return ISC_R_UNEXPECTED;
+	memset(&raw, 0, sizeof(raw));
+	if (!buffer_allocate(&raw.buffer, cc, MDL)) {
+		log_error("dhcpv4o6_handler: no memory buffer.");
+		return ISC_R_NOMEMORY;
+	}
+	raw.data = raw.buffer->data;
+	raw.len = cc;
+	memcpy(raw.buffer->data, buf, cc);
 
 	if (local_family == AF_INET6) {
-		if (cc < DHCP_FIXED_NON_UDP + 32)
-			return ISC_R_UNEXPECTED;
-		memset(&raw, 0, sizeof(raw));
-		if (!buffer_allocate(&raw.buffer, cc, MDL)) {
-			log_error("dhcpv4o6_handler: "
-				  "no memory buffer.");
-			return ISC_R_NOMEMORY;
-		}
-		raw.data = raw.buffer->data;
-		raw.len = cc;
-		memcpy(raw.buffer->data, buf, cc);
-
 		send_dhcpv4_response(&raw);
-
-		data_string_forget(&raw, MDL);
 	} else {
-		if (cc < DHCP_FIXED_NON_UDP + 32)
-			return ISC_R_UNEXPECTED;
-		memset(&raw, 0, sizeof(raw));
-		if (!buffer_allocate(&raw.buffer, cc, MDL)) {
-			log_error("dhcpv4o6_handler: "
-				  "no memory buffer.");
-			return ISC_R_NOMEMORY;
-		}
-		raw.data = raw.buffer->data;
-		raw.len = cc;
-		memcpy(raw.buffer->data, buf, cc);
-
 		recv_dhcpv4_query(&raw);
-
-		data_string_forget(&raw, MDL);
 	}
+
+	data_string_forget(&raw, MDL);
 
 	return ISC_R_SUCCESS;
 }
 
 /*
- * DHCPv6 server function: send the DHCPv4-response back to the DHCPv6 client.
+ * \brief Send the DHCPv4-response back to the DHCPv6 side
+ *  (DHCPv6 server function)
+ *
  * Format: interface:16 + address:16 + DHCPv6 DHCPv4-response message
+ *
+ * \param raw the IPC message content
  */
-
 static void send_dhcpv4_response(struct data_string *raw) {
 	struct interface_info *ip;
 	char name[16 + 1];
@@ -6661,7 +6655,15 @@ exit:
 }
 
 #ifdef DHCP4o6
-/* DHCPv4 server side */
+/* \brief Internal processing of a relayed DHCPv4-query
+ *  (DHCPv4 server side)
+ *
+ * Code copied from \ref dhcpv6_relay_forw() which itself is
+ * from \ref do_packet6().
+ *
+ * \param reply_ret pointer to the response
+ * \param packet the query
+ */
 static void
 dhcp4o6_relay_forw(struct data_string *reply_ret, struct packet *packet) {
 	struct option_cache *oc;
@@ -6946,7 +6948,13 @@ exit:
 }
 
 /*
- * DHCPv4 server function: internal processing of a DHCPv4-query.
+ * \brief Internal processing of a DHCPv4-query
+ *  (DHCPv4 server function)
+ *
+ * Code copied from \ref do_packet().
+ *
+ * \param reply_ret pointer to the response
+ * \param packet the query
  */
 static void
 dhcp4o6_dhcpv4_query(struct data_string *reply_ret, struct packet *packet) {
@@ -7126,8 +7134,12 @@ exit:
 }
 
 /*
- * DHCPv6 server function: forward a DHCPv4-query message to the DHCPv4 server.
+ * \brief Forward a DHCPv4-query message to the DHCPv4 side
+ *  (DHCPv6 server function)
+ *
  * Format: interface:16 + address:16 + DHCPv6 DHCPv4-query message
+ *
+ * \brief packet the DHCPv6 DHCPv4-query message
  */
 static void forw_dhcpv4_query(struct packet *packet) {
 	struct data_string ds;
@@ -7399,9 +7411,15 @@ dhcpv6(struct packet *packet) {
 
 #ifdef DHCP4o6
 /*
- * DHCPv4 server function: receive a message with a DHCPv4-query inside
- * from the DHCPv6 server.
+ * \brief Receive a DHCPv4-query message from the DHCPv6 side
+ *  (DHCPv4 server function)
+ *
+ * Receive a message with a DHCPv4-query inside from the DHCPv6 server.
+ * (code copied from \ref do_packet6() \ref and dhcpv6())
+ *
  * Format: interface:16 + address:16 + DHCPv6 DHCPv4-query message
+ *
+ * \param raw the DHCPv6 DHCPv4-query message raw content
  */
 static void recv_dhcpv4_query(struct data_string *raw) {
 	struct interface_info *ip;
