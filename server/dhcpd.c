@@ -95,10 +95,6 @@ trace_type_t *trace_srandom;
 
 char *progname;
 
-#if defined(DHCPv6) && defined(DHCP4o6)
-extern void dhcp4o6_setup(u_int16_t port);
-#endif
-
 static isc_result_t verify_addr (omapi_object_t *l, omapi_addr_t *addr) {
 	return ISC_R_SUCCESS;
 }
