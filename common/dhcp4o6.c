@@ -35,6 +35,8 @@ omapi_object_type_t *dhcp4o6_type = NULL;
 
 static int dhcp4o6_readsocket(omapi_object_t *);
 
+extern struct universe isc6_universe;
+
 /*
  * DHCPv4 over DHCPv6 Inter Process Communication setup
  *
@@ -112,5 +114,192 @@ void dhcp4o6_setup(u_int16_t port) {
 static int dhcp4o6_readsocket(omapi_object_t *h) {
 	IGNORE_UNUSED(h);
 	return dhcp4o6_fd;
+}
+
+/*
+ * \brief Get parameters from the ISC vendor option
+ *
+ * DHCPv4-over-DHCPv6 Inter-Process Communication tool.
+ *
+ * Get the interface name and the source address from the ISC vendor option.
+ * Note as a side effect the sub-options are removed on success.
+ *
+ * \param options the option_state
+ * \param ifname the data_string which will receive the interface name
+ * \param srcaddr the data_string which will receive the source address
+ * \return the number of found sub-options
+ */
+int ipc4o6_get_params(struct option_state *options,
+		      struct data_string *ifname,
+		      struct data_string *srcaddr)
+{
+	struct option_cache *oc;
+
+	oc = lookup_option(&isc6_universe, options, D4O6_INTERFACE);
+	if (oc == NULL) {
+		return (0);
+	}
+	memset(ifname, 0, sizeof(*ifname));
+	if (!evaluate_option_cache(ifname, NULL, NULL, NULL,
+				   options, NULL, &global_scope, oc, MDL)) {
+		return (0);
+	}
+
+	oc = lookup_option(&isc6_universe, options, D4O6_SRC_ADDRESS);
+	if (oc == NULL) {
+		data_string_forget(ifname, MDL);
+		return (1);
+	}
+	memset(srcaddr, 0, sizeof(*srcaddr));
+	if (!evaluate_option_cache(srcaddr, NULL, NULL, NULL,
+				   options, NULL, &global_scope, oc, MDL)) {
+		data_string_forget(ifname, MDL);
+		return (1);
+	}
+	if (srcaddr->len != 16) {
+		data_string_forget(ifname, MDL);
+		data_string_forget(srcaddr, MDL);
+		return (1);
+	}
+
+	delete_option(&isc6_universe, options, D4O6_INTERFACE);
+	delete_option(&isc6_universe, options, D4O6_SRC_ADDRESS);
+
+	return (2);
+}
+
+static const int required_opts_ipc4o6[] = {
+	D6O_VENDOR_OPTS,
+	0
+};
+
+/*
+ * \brief Add the ISC vendor option with parameters
+ *
+ * DHCPv4-over-DHCPv6 Inter-Process Communication tool.
+ *
+ * Add the parameters to the ISC vendor option and store it.
+ *
+ * \param buf the (message) buffer
+ * \param buflen the buffer length
+ * \param ifname the interface name
+ * \param srcaddr the source address
+ * \return the amount of added data
+ */
+int ipc4o6_add_params(char *buf, int buflen,
+		      struct data_string *ifname,
+		      struct data_string *srcaddr)
+{
+	struct option_state *opt_state;
+	int byte_count = 0;
+
+	opt_state = NULL;
+	if (!option_state_allocate(&opt_state, MDL)) {
+		log_error("ipc4o6_add_params: no memory for option.");
+		return (0);
+	}
+
+	if (!save_option_buffer(&isc6_universe,
+				opt_state,
+				ifname->buffer,
+				(unsigned char *)ifname->data,
+				ifname->len,
+				D4O6_INTERFACE,
+				0)) {
+		goto exit;
+	}
+	if (!save_option_buffer(&isc6_universe,
+				opt_state,
+				srcaddr->buffer,
+				(unsigned char *)srcaddr->data,
+				srcaddr->len,
+				D4O6_SRC_ADDRESS,
+				0)) {
+		goto exit;
+	}
+
+	byte_count = store_options6(buf, buflen, opt_state,
+				    NULL, required_opts_ipc4o6, NULL);
+
+    exit:
+	option_state_dereference(&opt_state, MDL);
+
+	return (byte_count);
+}
+
+/*
+ * \brief Zap the ISC vendor option
+ *
+ * DHCPv4-over-DHCPv6 Inter-Process Communication tool.
+ *
+ * Zap the ISC vendor option from the message buffer
+ *
+ * \param raw the raw message
+ */
+void ipc4o6_zap_params(struct data_string *raw) {
+	unsigned int offset;
+	unsigned len;
+	unsigned code;
+
+	offset = (unsigned)(offsetof(struct dhcpv6_packet, options));
+	if ((raw->data[0] == DHCPV6_RELAY_FORW) ||
+	    (raw->data[0] == DHCPV6_RELAY_REPL)) {
+		offset =
+		    (unsigned)(offsetof(struct dhcpv6_relay_packet, options));
+	}
+
+	for (;;) {
+		if (offset > raw->len) {
+			log_error("ipc4o6_zap_params: overflow.");
+			return;
+		}
+		if (offset == raw->len) {
+			log_error("ipc4o6_zap_params: not found.");
+			return;
+		}
+		if (offset + 4 > raw->len) {
+			log_error("ipc4o6_zap_params: no header.");
+			return;
+		}
+		code = getUShort(raw->data + offset);
+		offset += 2;
+		len = getUShort(raw->data + offset);
+		offset += 2;
+		if (code != D6O_VENDOR_OPTS) {
+			offset += len;
+			continue;
+		}
+		if (len < 4) {
+			log_error("ipc4o6_zap_params: no enterprise code.");
+			offset += len;
+			continue;
+		}
+		code = getULong(raw->data + offset);
+		if (code != VENDOR_ISC_SUBOPTIONS) {
+			offset += len;
+			continue;
+		}
+
+		/* Got it! */
+		break;
+	}
+
+	/* If we are here we have the ISC vendor option
+	   from offset - 4 to offset + len */
+	if (offset + len > raw->len) {
+		log_error("ipc4o6_zap_params: vsio overflow.");
+	}
+	if (offset + len >= raw->len) {
+		/* Easy case: the option is the last one. */
+		raw->len = offset - 4;
+		return;
+	}
+	/* Hard case: zap it */
+	memmove((unsigned char *)raw->data + offset - 4,
+		raw->data + offset + len,
+		raw->len - (offset + len));
+	raw->len -= len + 4;
+
+	return;
 }
 #endif /* DHCP4o6 */

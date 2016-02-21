@@ -27,6 +27,13 @@ static void send_dhcpv4_response(struct data_string *raw);
 static void recv_dhcpv4_query(struct data_string *raw);
 static void dhcp4o6_dhcpv4_query(struct data_string *reply_ret,
 				 struct packet *packet);
+extern int ipc4o6_get_params(struct option_state *options,
+			     struct data_string *ifname,
+			     struct data_string *srcaddr);
+extern int ipc4o6_add_params(char *buf, int buflen,
+			     struct data_string *ifname,
+			     struct data_string *srcaddr);
+extern void ipc4o6_zap_params(struct data_string *raw);
 #endif
 
 /*
@@ -198,7 +205,7 @@ isc_result_t dhcpv4o6_handler(omapi_object_t *h) {
 
 	cc = recv(dhcp4o6_fd, buf, sizeof(buf), 0);
 
-	if (cc < DHCP_FIXED_NON_UDP + 32)
+	if (cc < DHCP_FIXED_NON_UDP)
 		return ISC_R_UNEXPECTED;
 	memset(&raw, 0, sizeof(raw));
 	if (!buffer_allocate(&raw.buffer, cc, MDL)) {
@@ -224,52 +231,93 @@ isc_result_t dhcpv4o6_handler(omapi_object_t *h) {
  * \brief Send the DHCPv4-response back to the DHCPv6 side
  *  (DHCPv6 server function)
  *
- * Format: interface:16 + address:16 + DHCPv6 DHCPv4-response message
- *
  * \param raw the IPC message content
  */
 static void send_dhcpv4_response(struct data_string *raw) {
+	unsigned char msg_type;
+	struct option_state *opt_state;
+	int opt_offset;
+	struct data_string ifname;
+	struct data_string srcaddr;
 	struct interface_info *ip;
-	char name[16 + 1];
 	struct sockaddr_in6 to_addr;
 	char pbuf[sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255")];
 	int send_ret;
 
-	memset(name, 0, sizeof(name));
-	memcpy(name, raw->data, 16);
+	msg_type = raw->data[0];
+
+	opt_state = NULL;
+	if (!option_state_allocate(&opt_state, MDL)) {
+		log_error("send_dhcpv4_response: no memory for option.");
+		return;
+	}
+
+	opt_offset = (int)(offsetof(struct dhcpv6_packet, options));
+	if ((msg_type == DHCPV6_RELAY_FORW) ||
+	    (msg_type == DHCPV6_RELAY_REPL)) {
+		opt_offset = (int)(offsetof(struct dhcpv6_relay_packet,
+					    options));
+	}
+
+	if (!parse_option_buffer(opt_state,
+				 raw->data + opt_offset,
+				 raw->len - opt_offset,
+				 &dhcpv6_universe)) {
+		option_state_dereference(&opt_state, MDL);
+		return;
+	}
+
+	switch (ipc4o6_get_params(opt_state, &ifname, &srcaddr)) {
+	case 0:
+		log_error("send_dhcpv4_response: no params.");
+		option_state_dereference(&opt_state, MDL);
+		return;
+	case 1:
+		log_error("send_dhcpv4_response: incomplete params.");
+		option_state_dereference(&opt_state, MDL);
+		return;
+	}
+
+	option_state_dereference(&opt_state, MDL);
+
 	for (ip = interfaces; ip != NULL; ip = ip->next) {
-		if (!strcmp(name, ip->name))
+		if (!strcmp((const char *)ifname.data, ip->name))
 			break;
 	}
+	data_string_forget(&ifname, MDL);
 	if (ip == NULL) {
 		log_error("send_dhcpv4_response: can't find interface %s.",
-			  name);
+			  (const char *)ifname.data);
+		data_string_forget(&srcaddr, MDL);
 		return;
 	}
 
 	memset(&to_addr, 0, sizeof(to_addr));
 	to_addr.sin6_family = AF_INET6;
-	memcpy(&to_addr.sin6_addr, raw->data + 16, 16);
-	if ((raw->data[32] == DHCPV6_RELAY_FORW) ||
-	    (raw->data[32] == DHCPV6_RELAY_REPL)) {
+	memcpy(&to_addr.sin6_addr, srcaddr.data, 16);
+	data_string_forget(&srcaddr, MDL);
+	if ((msg_type == DHCPV6_RELAY_FORW) ||
+	    (msg_type == DHCPV6_RELAY_REPL)) {
 		to_addr.sin6_port = local_port;
 	} else {
 		to_addr.sin6_port = remote_port;
 	}
 
 	log_info("send_dhcpv4_response(): sending %s on %s to %s port %d",
-		 dhcpv6_type_names[raw->data[32]],
-		 name,
-		 inet_ntop(AF_INET6, raw->data + 16, pbuf, sizeof(pbuf)),
+		 dhcpv6_type_names[msg_type],
+		 ip->name,
+		 inet_ntop(AF_INET6, &to_addr.sin6_addr, pbuf, sizeof(pbuf)),
 		 ntohs(to_addr.sin6_port));
 
-	send_ret = send_packet6(ip, raw->data + 32, raw->len - 32, &to_addr);
+	ipc4o6_zap_params(raw);
+
+	send_ret = send_packet6(ip, raw->data, raw->len, &to_addr);
 	if (send_ret < 0) {
 		log_error("send_dhcpv4_response: send_packet6(): %m");
-	} else if (send_ret != raw->len - 32) {
+	} else if (send_ret != raw->len) {
 		log_error("send_dhcpv4_response: send_packet6() "
 			  "sent %d of %d bytes",
-			  send_ret, raw->len - 32);
+			  send_ret, raw->len);
 	}
 }
 #endif /* DHCP4o6 */
@@ -7137,13 +7185,13 @@ exit:
  * \brief Forward a DHCPv4-query message to the DHCPv4 side
  *  (DHCPv6 server function)
  *
- * Format: interface:16 + address:16 + DHCPv6 DHCPv4-query message
- *
  * \brief packet the DHCPv6 DHCPv4-query message
  */
 static void forw_dhcpv4_query(struct packet *packet) {
+	struct data_string ifname;
+	struct data_string srcaddr;
 	struct data_string ds;
-	unsigned len;
+	unsigned len, extra;
 	int cc;
 
 	/* Get the initial message. */
@@ -7158,24 +7206,60 @@ static void forw_dhcpv4_query(struct packet *packet) {
 		return;
 	}
 
+	/* Get storage for parameters */
+	extra = len = strlen(packet->interface->name);
+	memset(&ifname, 0, sizeof(ifname));
+	if (!buffer_allocate(&ifname.buffer, len, MDL)) {
+		log_error("forw_dhcpv4_query: "
+			  "no memory for interface name.");
+		return;
+	}
+	ifname.data = ifname.buffer->data;
+	ifname.len = len;
+	memcpy((char *)ifname.data, packet->interface->name, len);
+
+	memset(&srcaddr, 0, sizeof(srcaddr));
+	extra += 16;
+	if (!buffer_allocate(&srcaddr.buffer, 16, MDL)) {
+		log_error("forw_dhcpv4_query: "
+			  "no memory for client address.");
+		data_string_forget(&ifname, MDL);
+		return;
+	}
+	srcaddr.data = srcaddr.buffer->data;
+	srcaddr.len = 16;
+	memcpy((unsigned char *)srcaddr.data, packet->client_addr.iabuf, 16);
+
+	/* 3 headers and an enterprise */
+	extra += 4 * 4;
+
 	/* Get a buffer. */
-	len = packet->packet_length + 32;
+	len = packet->packet_length + extra;
 	memset(&ds, 0, sizeof(ds));
 	if (!buffer_allocate(&ds.buffer, len, MDL)) {
 		log_error("forw_dhcpv4_query: "
 			  "no memory for encapsulating packet.");
+		data_string_forget(&ifname, MDL);
+		data_string_forget(&srcaddr, MDL);
 		return;
 	}
 	ds.data = ds.buffer->data;
 	ds.len = len;
 
 	/* Fill the buffer. */
-	strncpy((char *)ds.buffer->data, packet->interface->name, 16);
-	memcpy(ds.buffer->data + 16,
-	       packet->client_addr.iabuf, 16);
-	memcpy(ds.buffer->data + 32,
+	memcpy(ds.buffer->data,
 	       (unsigned char *)packet->raw,
 	       packet->packet_length);
+	cc = ipc4o6_add_params((char *)ds.buffer->data + packet->packet_length,
+			       ds.len - packet->packet_length,
+			       &ifname, &srcaddr);
+	data_string_forget(&ifname, MDL);
+	data_string_forget(&srcaddr, MDL);
+	if (cc != (int)extra) {
+		log_error("forw_dhcpv4_query: "
+			  "ipc4o6_add_params added %d on expected %u.",
+			  cc, extra);
+	}
 
 	/* Forward to the DHCPv4 server. */
 	cc = send(dhcp4o6_fd, ds.data, ds.len, 0);
@@ -7417,46 +7501,29 @@ dhcpv6(struct packet *packet) {
  * Receive a message with a DHCPv4-query inside from the DHCPv6 server.
  * (code copied from \ref do_packet6() \ref and dhcpv6())
  *
- * Format: interface:16 + address:16 + DHCPv6 DHCPv4-query message
- *
  * \param raw the DHCPv6 DHCPv4-query message raw content
  */
 static void recv_dhcpv4_query(struct data_string *raw) {
-	struct interface_info *ip;
-	char name[16 + 1];
-	struct iaddr iaddr;
 	struct packet *packet;
 	unsigned char msg_type;
 	const struct dhcpv6_relay_packet *relay;
 	const struct dhcpv4_over_dhcpv6_packet *msg;
+	struct data_string ifname;
+	struct data_string srcaddr;
+	struct interface_info *ip;
+	struct iaddr iaddr;
 	struct data_string reply;
 	struct data_string ds;
-	unsigned len;
+	unsigned len, extra;
 	int cc;
-
-	memset(name, 0, sizeof(name));
-	memcpy(name, raw->data, 16);
-	for (ip = interfaces; ip != NULL; ip = ip->next) {
-		if (!strcmp(name, ip->name))
-			break;
-	}
-	if (ip == NULL) {
-		log_error("recv_dhcpv4_query: can't find interface %s.",
-			  name);
-		return;
-	}
-
-	iaddr.len = 16;
-	memcpy(iaddr.iabuf, raw->data + 16, 16);
 
 	/*
 	 * From do_packet6().
 	 */
 
-	if (!packet6_len_okay((char *)raw->data + 32, raw->len - 32)) {
-		log_error("recv_dhcpv4_query: "
-			 "short packet from %s, len %d, dropped",
-			 piaddr(iaddr), raw->len - 32);
+	if (!packet6_len_okay((char *)raw->data, raw->len)) {
+		log_error("recv_dhcpv4_query: short packet len %d, dropped",
+			  raw->len);
 		return;
 	}
 
@@ -7475,18 +7542,16 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 		return;
 	}
 
-	packet->raw = (struct dhcp_packet *)(raw->data + 32);
-	packet->packet_length = raw->len - 32;
+	packet->raw = (struct dhcp_packet *)raw->data;
+	packet->packet_length = raw->len;
 	packet->client_port = remote_port;
-	packet->client_addr = iaddr;
-	interface_reference(&packet->interface, ip, MDL);
 
-	msg_type = raw->data[32];
+	msg_type = raw->data[0];
 	if ((msg_type == DHCPV6_RELAY_FORW) ||
 	    (msg_type == DHCPV6_RELAY_REPL)) {
 		int relaylen =
 		    (int)(offsetof(struct dhcpv6_relay_packet, options));
-		relay = (const struct dhcpv6_relay_packet *)(raw->data + 32);
+		relay = (const struct dhcpv6_relay_packet *)raw->data;
 		packet->dhcpv6_msg_type = relay->msg_type;
 
 		/* relay-specific data */
@@ -7498,7 +7563,7 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 
 		if (!parse_option_buffer(packet->options,
 					 relay->options,
-					 raw->len - 32 - relaylen,
+					 raw->len - relaylen,
 					 &dhcpv6_universe)) {
 			/* no logging here, as parse_option_buffer() logs all
 			   cases where it fails */
@@ -7509,7 +7574,7 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 		   (msg_type == DHCPV6_DHCPV4_RESPONSE)) {
 		int msglen =
 		    (int)(offsetof(struct dhcpv4_over_dhcpv6_packet, options));
-		msg = (struct dhcpv4_over_dhcpv6_packet *)(raw->data + 32);
+		msg = (struct dhcpv4_over_dhcpv6_packet *)raw->data;
 		packet->dhcpv6_msg_type = msg->msg_type;
 
 		/* message-specific data */
@@ -7518,7 +7583,7 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 
 		if (!parse_option_buffer(packet->options,
 					 msg->options,
-					 raw->len - 32 - msglen,
+					 raw->len - msglen,
 					 &dhcpv6_universe)) {
 			/* no logging here, as parse_option_buffer() logs all
 			   cases where it fails */
@@ -7531,6 +7596,38 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 		packet_dereference(&packet, MDL);
 		return;
 	}
+
+	/*
+	 * Get DHCP4o6 IPC parameters.
+	 */
+	switch (ipc4o6_get_params(packet->options, &ifname, &srcaddr)) {
+	case 0:
+		log_error("recv_dhcpv4_query: no params.");
+		packet_dereference(&packet, MDL);
+		return;
+	case 1:
+		log_error("recv_dhcpv4_query: incomplete params.");
+		packet_dereference(&packet, MDL);
+		return;
+	}
+
+	for (ip = interfaces; ip != NULL; ip = ip->next) {
+		if (!strcmp((const char *)ifname.data, ip->name))
+			break;
+	}
+	data_string_forget(&ifname, MDL);
+	if (ip == NULL) {
+		log_error("recv_dhcpv4_query: can't find interface %s.",
+			  (const char *)ifname.data);
+		packet_dereference(&packet, MDL);
+		return;
+	}
+	interface_reference(&packet->interface, ip, MDL);
+
+	iaddr.len = 16;
+	memcpy(iaddr.iabuf, srcaddr.data, 16);
+	data_string_forget(&srcaddr, MDL);
+	packet->client_addr = iaddr;
 
 	/*
 	 * From dhcpv6().
@@ -7584,21 +7681,60 @@ static void recv_dhcpv4_query(struct data_string *raw) {
 	if (reply.data == NULL)
 		return;
 
-	/*
-	 * Forward the response.
-	 */
-	len = reply.len + 32;
+	/* Get storage for parameters */
+	extra = len = strlen(ip->name);
+	memset(&ifname, 0, sizeof(ifname));
+	if (!buffer_allocate(&ifname.buffer, len, MDL)) {
+		log_error("recv_dhcpv4_query: "
+			  "no memory for interface name.");
+		return;
+	}
+	ifname.data = ifname.buffer->data;
+	ifname.len = len;
+	memcpy((char *)ifname.data, ip->name, len);
+
+	memset(&srcaddr, 0, sizeof(srcaddr));
+	extra += 16;
+	if (!buffer_allocate(&srcaddr.buffer, 16, MDL)) {
+		log_error("recv_dhcpv4_query: "
+			  "no memory for client address.");
+		data_string_forget(&ifname, MDL);
+		return;
+	}
+	srcaddr.data = srcaddr.buffer->data;
+	srcaddr.len = 16;
+	memcpy((unsigned char *)srcaddr.data, iaddr.iabuf, 16);
+
+	/* 3 headers and an enterprise */
+	extra += 4 * 4;
+
+	/* Get a buffer. */
+	len = reply.len + extra;
 	memset(&ds, 0, sizeof(ds));
 	if (!buffer_allocate(&ds.buffer, len, MDL)) {
-		log_error("recv_dhcpv4_query: no memory.");
+		log_error("recv_dhcpv4_query: "
+			  "no memory for encapsulating packet.");
+		data_string_forget(&ifname, MDL);
+		data_string_forget(&srcaddr, MDL);
 		return;
 	}
 	ds.data = ds.buffer->data;
 	ds.len = len;
 
-	memcpy(ds.buffer->data, name, 16);
-	memcpy(ds.buffer->data + 16, iaddr.iabuf, 16);
-	memcpy(ds.buffer->data + 32, reply.data, reply.len);
+	/* Fill the buffer. */
+	memcpy(ds.buffer->data, reply.data, reply.len);
+	cc = ipc4o6_add_params((char *)ds.buffer->data + reply.len,
+			       ds.len - reply.len,
+			       &ifname, &srcaddr);
+	data_string_forget(&ifname, MDL);
+	data_string_forget(&srcaddr, MDL);
+	if (cc != (int)extra) {
+		log_error("recv_dhcpv4_query: "
+			  "ipc4o6_add_params added %d on expected %u.",
+			  cc, extra);
+	}
+
+	/* Forward the response to the DHCPv4 server. */
 	cc = send(dhcp4o6_fd, ds.data, ds.len, 0);
 	if (cc < 0)
 		log_error("recv_dhcpv4_query: send(): %m");
