@@ -1449,12 +1449,12 @@ void initialize_common_option_spaces()
 	isc6_universe.encapsulate = hashed_option_space_encapsulate;
 	isc6_universe.foreach = hashed_option_space_foreach;
 	isc6_universe.decode = parse_option_buffer;
-	isc6_universe.length_size = 0;
-	isc6_universe.tag_size = 4;
-	isc6_universe.get_tag = getULong;
-	isc6_universe.store_tag = putULong;
-	isc6_universe.get_length = NULL;
-	isc6_universe.store_length = NULL;
+	isc6_universe.length_size = 2;
+	isc6_universe.tag_size = 2;
+	isc6_universe.get_tag = getUShort;
+	isc6_universe.store_tag = putUShort;
+	isc6_universe.get_length = getUShort;
+	isc6_universe.store_length = putUShort;
 	isc6_universe.site_code_min = 0;
 	/* No END option. */
 	isc6_universe.end = 0x00;
