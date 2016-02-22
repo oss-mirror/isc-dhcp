@@ -168,11 +168,6 @@ int ipc4o6_get_params(struct option_state *options,
 	return (2);
 }
 
-static const int required_opts_ipc4o6[] = {
-	D6O_VENDOR_OPTS,
-	0
-};
-
 /*
  * \brief Add the ISC vendor option with parameters
  *
@@ -190,41 +185,41 @@ int ipc4o6_add_params(char *buf, int buflen,
 		      struct data_string *ifname,
 		      struct data_string *srcaddr)
 {
-	struct option_state *opt_state;
-	int byte_count = 0;
+	unsigned len = ifname->len + srcaddr->len;
+	unsigned char *p = (unsigned char*)buf;
 
-	opt_state = NULL;
-	if (!option_state_allocate(&opt_state, MDL)) {
-		log_error("ipc4o6_add_params: no memory for option.");
+	/* Check buffer length */
+	len = ifname->len + srcaddr->len;
+	if (4 * 4 + len > buflen) {
+		log_error("ipc4o6_add_params: underflow.");
 		return (0);
 	}
 
-	if (!save_option_buffer(&isc6_universe,
-				opt_state,
-				ifname->buffer,
-				(unsigned char *)ifname->data,
-				ifname->len,
-				D4O6_INTERFACE,
-				0)) {
-		goto exit;
-	}
-	if (!save_option_buffer(&isc6_universe,
-				opt_state,
-				srcaddr->buffer,
-				(unsigned char *)srcaddr->data,
-				srcaddr->len,
-				D4O6_SRC_ADDRESS,
-				0)) {
-		goto exit;
-	}
+	/* Put header */
+	putUShort(p, D6O_VENDOR_OPTS);
+	p += 2;
+	putUShort(p, 3 * 4 + len);
+	p += 2;
+	putULong(p, VENDOR_ISC_SUBOPTIONS);
+	p += 4;
 
-	byte_count = store_options6(buf, buflen, opt_state,
-				    NULL, required_opts_ipc4o6, NULL);
+	/* Put interface name */
+	putUShort(p, D4O6_INTERFACE);
+	p += 2;
+	putUShort(p, ifname->len);
+	p += 2;
+	memcpy(p, ifname->data, ifname->len);
+	p += ifname->len;
 
-    exit:
-	option_state_dereference(&opt_state, MDL);
+	/* Put source address */
+	putUShort(p, D4O6_SRC_ADDRESS);
+	p += 2;
+	putUShort(p, srcaddr->len);
+	p += 2;
+	memcpy(p, srcaddr->data, srcaddr->len);
+	p += srcaddr->len;
 
-	return (byte_count);
+	return ((int)((char *)p - buf));
 }
 
 /*
