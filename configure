@@ -1443,7 +1443,7 @@ Optional Features:
                           yes)
   --enable-tracing        enable support for server activity tracing (default
                           is yes)
-  --enable-delayed-ack    queues multiple DHCPACK replies (default is no)
+  --enable-delayed-ack    queues multiple DHCPACK replies (default is yes)
   --enable-dhcpv6         enable support for DHCPv6 (default is yes)
   --enable-dhcpv4o6       enable support for DHCPv4-over-DHCPv6 (default is
                           no)
@@ -5443,18 +5443,18 @@ $as_echo "#define TRACING 1" >>confdefs.h
 
 fi
 
-# Delayed-ack feature support (experimental).
+# Delayed-ack feature support.
 # Check whether --enable-delayed_ack was given.
 if test "${enable_delayed_ack+set}" = set; then :
   enableval=$enable_delayed_ack;
 fi
 
-if test "$enable_delayed_ack" = "yes"; then
+# Delayed-ack is on by default, so define if it is not explicitly disabled.
+if test "$enable_delayed_ack" != "no"; then
+	enable_delayed_ack="yes"
 
 $as_echo "#define DELAYED_ACK 1" >>confdefs.h
 
-else
-    enable_delayed_ack="no"
 fi
 
 # DHCPv6 optional compile-time feature.
