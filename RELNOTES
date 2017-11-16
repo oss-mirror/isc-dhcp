@@ -177,6 +177,13 @@ dhcp-users@lists.isc.org.
   the MPL 2.0 license terms.
   [ISC-Bugs #45541]
 
+- Support for delayed-ack is now compiled in by default. Prior to this
+  it had to be enabled at compile time via --enable-delayed-acks. The
+  default value for delayed-ack, however, has been changed from 28 to 0
+  (i.e. disabled).  This was done to minimize the impact on users not
+  currently using the feature.
+  [ISC-Bugs #42446]
+
 			Changes since 4.3.0 (bug fixes)
 
 - Tidy up several small tickets.
