@@ -5449,8 +5449,8 @@ if test "${enable_delayed_ack+set}" = set; then :
   enableval=$enable_delayed_ack;
 fi
 
-if test "$enable_delayed_ack" != "no"; then
 # Delayed-ack is on by default, so define if it is not explicitly disabled.
+if test "$enable_delayed_ack" != "no"; then
 	enable_delayed_ack="yes"
 
 $as_echo "#define DELAYED_ACK 1" >>confdefs.h
