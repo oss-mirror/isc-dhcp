@@ -142,14 +142,14 @@ if test "$enable_tracing" != "no" ; then
 		  [Define to include server activity tracing support.])
 fi
 
-# Delayed-ack feature support.
+# Delayed-ack feature support (experimental).
 AC_ARG_ENABLE(delayed_ack,
-	AS_HELP_STRING([--enable-delayed-ack],[queues multiple DHCPACK replies (default is yes)]))
-# Delayed-ack is on by default, so define if it is not explicitly disabled.
-if test "$enable_delayed_ack" != "no"; then
-	enable_delayed_ack="yes"
+	AS_HELP_STRING([--enable-delayed-ack],[queues multiple DHCPACK replies (default is no)]))
+if test "$enable_delayed_ack" = "yes"; then
 	AC_DEFINE([DELAYED_ACK], [1],
 		  [Define to queue multiple DHCPACK replies per fsync.])
+else
+    enable_delayed_ack="no"
 fi
 
 # DHCPv6 optional compile-time feature.
@@ -170,10 +170,6 @@ if test "$enable_dhcpv4o6" = "yes"; then
 	# DHCPv4o6 requires DHCPv6
 	if test "$enable_dhcpv6" = "no"; then
 		AC_MSG_ERROR([dhcpv4o6 requires dhcpv6])
-	fi
-	# DHCPv4o6 is not yet compatible with delayed-ack
-	if test "$enable_delayed_ack" = "yes"; then
-		AC_MSG_ERROR([dhcpv4o6 is not compatible with delayed-ack])
 	fi
 	AC_DEFINE([DHCP4o6], [1], 
 		  [Define to 1 to include DHCPv4 over DHCPv6 support.])
