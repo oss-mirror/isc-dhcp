@@ -5450,12 +5450,11 @@ if test "${enable_delayed_ack+set}" = set; then :
 fi
 
 if test "$enable_delayed_ack" != "no"; then
+# Delayed-ack is on by default, so define if it is not explicitly disabled.
 	enable_delayed_ack="yes"
 
 $as_echo "#define DELAYED_ACK 1" >>confdefs.h
 
-else
-    enable_delayed_ack="no"
 fi
 
 # DHCPv6 optional compile-time feature.

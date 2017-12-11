@@ -146,11 +146,10 @@ fi
 AC_ARG_ENABLE(delayed_ack,
 	AS_HELP_STRING([--enable-delayed-ack],[queues multiple DHCPACK replies (default is yes)]))
 if test "$enable_delayed_ack" != "no"; then
+# Delayed-ack is on by default, so define if it is not explicitly disabled.
 	enable_delayed_ack="yes"
 	AC_DEFINE([DELAYED_ACK], [1],
 		  [Define to queue multiple DHCPACK replies per fsync.])
-else
-    enable_delayed_ack="no"
 fi
 
 # DHCPv6 optional compile-time feature.
