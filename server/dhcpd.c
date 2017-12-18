@@ -586,7 +586,7 @@ main(int argc, char **argv) {
 		                path_dhcpd_pid = _PATH_DHCPD6_PID;
 	        }
         } else
-#else /* !DHCPv6 */
+#endif /* DHCPv6 */
         {
 	        if (!no_dhcpd_db && (s = getenv ("PATH_DHCPD_DB"))) {
 		        path_dhcpd_db = s;
@@ -595,7 +595,6 @@ main(int argc, char **argv) {
 		        path_dhcpd_pid = s;
 	        }
         }
-#endif /* DHCPv6 */
 
         /*
          * convert relative path names to absolute, for files that need
