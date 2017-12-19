@@ -2643,12 +2643,6 @@ is:
     1. \fBlease-file-name\fR
     2. \fB-lf\fR flag
     3. \fBPATH_DHCPD_DB\fR environment variable.
-.PP
-Please note, the server requires the path to your lease file prior to
-processing your configuration file.  Therefore, when using lease-file-name
-you must specify the path through either \fB-lf\fR or \fBPATH_DHCPD_DB\fR.
-For example, if you set lease-file-name to "/usr/local/var/my.leases", then
-you must set either -lf or PATH_DHCPD_DB to "/usr/local/var".
 .RE
 .PP
 The
@@ -2684,13 +2678,6 @@ for the lease file name is:
     1. \fBdhcpv6-lease-file-name\fR
     2. \fB-lf\fR flag
     3. \fBPATH_DHCPD6_DB\fR environment variable.
-.PP
-Please note, the server requires the path to your lease file prior to
-processing your configuration file.  Therefore, when using
-dhcpv6-lease-file-name you must specify the path through either \fB-lf\fR or
-\fBPATH_DHCPD6_DB\fR.  For example, if you set dhcpv6-lease-file-name to
-"/usr/local/var/my6.leases", then you must set either -lf or PATH_DHCPD6_DB to
-"/usr/local/var".
 .RE
 .PP
 The
