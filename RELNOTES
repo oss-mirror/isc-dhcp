@@ -87,6 +87,16 @@ ISC DHCP is open source software maintained by Internet Systems
 Consortium.  This product includes cryptographic software written
 by Eric Young (eay@cryptsoft.com).
 
+		Changes since 4.4.0 (Bug Fixes)
+
+- <placeholder for delayed-ack>
+- <placeholder for 47139>
+
+- Option reference count was not correctly decremented in error path
+  when parsing buffer for options. Reported by Felix Wilhelm, Google
+  Security Team.
+  [ISC-Bugs #47140]
+
                 Changes since 4.4.0b1 (New Features)
 
 - Duplicate address detection when binding to a new IPv6 address was added

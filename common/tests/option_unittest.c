@@ -54,7 +54,6 @@ ATF_TC_BODY(option_refcnt, tc)
 	atf_tc_fail("option is NULL");
     }
     refcnt = option->refcnt;
-    fprintf(stderr, "refcnt is %d\n", refcnt);
 
     buffer[0] = 15;
     buffer[1] = 255; /* invalid */
