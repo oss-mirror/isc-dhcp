@@ -97,7 +97,7 @@ ATF_TC_BODY(pretty_print_option, tc)
 
     initialize_common_option_spaces();
 
-    // We'll use dhcp_client_identitifer because it happens to be format X
+    /* We'll use dhcp_client_identitifer because it happens to be format X */
     code = 61;
     option = NULL;
     if (!option_code_hash_lookup(&option, dhcp_universe.code_hash,
