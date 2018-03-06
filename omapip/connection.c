@@ -767,6 +767,7 @@ static isc_result_t make_dst_key (dst_key_t **dst_key, omapi_object_t *a) {
 	omapi_value_t *algorithm = (omapi_value_t *)0;
 	omapi_value_t *key       = (omapi_value_t *)0;
 	char *name_str = NULL;
+	char *algo_str = NULL;
 	isc_result_t status = ISC_R_SUCCESS;
 
 	if (status == ISC_R_SUCCESS)
@@ -782,11 +783,8 @@ static isc_result_t make_dst_key (dst_key_t **dst_key, omapi_object_t *a) {
 			(a, (omapi_object_t *)0, "key", &key);
 
 	if (status == ISC_R_SUCCESS) {
-		if ((algorithm->value->type != omapi_datatype_data &&
-		     algorithm->value->type != omapi_datatype_string) ||
-		    strncasecmp((char *)algorithm->value->u.buffer.value,
-				NS_TSIG_ALG_HMAC_MD5 ".",
-				algorithm->value->u.buffer.len) != 0) {
+		if (algorithm->value->type != omapi_datatype_data &&
+		     algorithm->value->type != omapi_datatype_string) {
 			status = DHCP_R_INVALIDARG;
 		}
 	}
@@ -798,23 +796,33 @@ static isc_result_t make_dst_key (dst_key_t **dst_key, omapi_object_t *a) {
 	}
 
 	if (status == ISC_R_SUCCESS) {
+		algo_str = dmalloc (algorithm -> value -> u.buffer.len + 1, MDL);
+		if (!algo_str)
+			status = ISC_R_NOMEMORY;
+	}
+
+	if (status == ISC_R_SUCCESS) {
 		memcpy (name_str,
 			name -> value -> u.buffer.value,
 			name -> value -> u.buffer.len);
 		name_str [name -> value -> u.buffer.len] = 0;
 
+		memcpy (algo_str,
+			algorithm -> value -> u.buffer.value,
+			algorithm -> value -> u.buffer.len);
+		algo_str [algorithm -> value -> u.buffer.len] = 0;
+
 		status = isclib_make_dst_key(name_str,
-					     DHCP_HMAC_MD5_NAME,
+					     algo_str,
 					     key->value->u.buffer.value,
 					     key->value->u.buffer.len,
 					     dst_key);
-
-		if (*dst_key == NULL)
-			status = ISC_R_NOMEMORY;
 	}
 
 	if (name_str)
 		dfree (name_str, MDL);
+	if (algo_str)
+		dfree (algo_str, MDL);
 	if (key)
 		omapi_value_dereference (&key, MDL);
 	if (algorithm)
