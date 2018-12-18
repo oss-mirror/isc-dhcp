@@ -783,8 +783,7 @@ static isc_result_t make_dst_key (dst_key_t **dst_key, omapi_object_t *a) {
 			(a, (omapi_object_t *)0, "key", &key);
 
 	if (status == ISC_R_SUCCESS) {
-		if (algorithm->value->type != omapi_datatype_data &&
-		     algorithm->value->type != omapi_datatype_string) {
+		if (algorithm->value->type != omapi_datatype_string) {
 			status = DHCP_R_INVALIDARG;
 		}
 	}
