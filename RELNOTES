@@ -168,6 +168,13 @@ by Eric Young (eay@cryptsoft.com).
 - Corrected a number of reference counter and zero-length buffer leaks.
   [ISC-Bugs #57]
 
+- Closed a small window of time between the installation of graceful
+  shutdown signal handlers and application context startup, during which
+  the receipt of shutdown signal would cause a REQUIRE() assertion to
+  occur.  Note this issue is only visible when compiling with
+  ENABLE_GENTLE_SHUTDOWN defined.
+  [Gitlab #53,!18   git TBD]
+
 		Changes since 4.4.0 (New Features)
 - none
 		Changes since 4.4.0 (Bug Fixes)
