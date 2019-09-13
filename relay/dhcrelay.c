@@ -2076,6 +2076,9 @@ dhcp_set_control_state(control_object_state_t oldstate,
 	if (newstate != server_shutdown)
 		return ISC_R_SUCCESS;
 
+	/* Log shutdown on signal. */
+	log_info("Received signal %d, initiating shutdown.", shutdown_signal);
+
 	if (no_pid_file == ISC_FALSE)
 		(void) unlink(path_dhcrelay_pid);
 
