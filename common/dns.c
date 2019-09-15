@@ -1246,7 +1246,7 @@ find_cached_zone(dhcp_ddns_cb_t *ddns_cb, int direction)
 	}
 
 	/* Make sure the zone name will fit. */
-	if (strlen(zone->name) > sizeof(ddns_cb->zone_name)) {
+	if (strlen(zone->name) >= sizeof(ddns_cb->zone_name)) {
 		dns_zone_dereference(&zone, MDL);
 		return (ISC_R_NOSPACE);
 	}
