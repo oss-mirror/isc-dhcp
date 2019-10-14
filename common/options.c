@@ -223,6 +223,7 @@ int parse_option_buffer (options, buffer, length, universe)
 				log_error("parse_option_buffer: "
 					  "save_option_buffer failed");
 				buffer_dereference(&bp, MDL);
+				option_dereference(&option, MDL);
 				return (0);
 			}
 		} else if (universe->concat_duplicates) {
@@ -234,6 +235,7 @@ int parse_option_buffer (options, buffer, length, universe)
 					     MDL)) {
 				log_error("parse_option_buffer: No memory.");
 				buffer_dereference(&bp, MDL);
+				option_dereference(&option, MDL);
 				return (0);
 			}
 			/* Copy old option to new data object. */
@@ -258,6 +260,7 @@ int parse_option_buffer (options, buffer, length, universe)
 			if (!option_cache_allocate(&nop, MDL)) {
 				log_error("parse_option_buffer: No memory.");
 				buffer_dereference(&bp, MDL);
+				option_dereference(&option, MDL);
 				return (0);
 			}
 

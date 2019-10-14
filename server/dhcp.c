@@ -1193,6 +1193,7 @@ void dhcpinform (packet, ms_nulltp)
 		if (d1.len != 4) {
 			log_info("%s: ignored (invalid subnet selection option).", msgbuf);
 			option_state_dereference(&options, MDL);
+			data_string_forget(&d1, MDL);
 			return;
 		}
 
@@ -1574,6 +1575,7 @@ void dhcpinform (packet, ms_nulltp)
 			option_state_dereference (&options, MDL);
 			if (subnet)
 				subnet_dereference (&subnet, MDL);
+			data_string_forget (&d1, MDL);
 			return;
 		}
 
@@ -3526,6 +3528,7 @@ void ack_lease (packet, lease, offer, when, msg, ms_nulltp, hp)
 					   (const char *)d1.data, d1.len,
 					   MDL)) {
 			log_error ("unknown option space %s.", d1.data);
+			data_string_forget (&d1, MDL);
 			return;
 		}
 

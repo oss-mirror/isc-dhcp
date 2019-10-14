@@ -1374,8 +1374,9 @@ void cache_found_zone(dhcp_ddns_ns_t *ns_cb)
 	/* See if there's already such a zone. */
 	if (dns_zone_lookup(&zone, ns_cb->zname) == ISC_R_SUCCESS) {
 		/* If it's not a dynamic zone, leave it alone. */
-		if (zone->timeout == 0)
-			return;
+		if (zone->timeout == 0) {
+			goto cleanup;
+		}
 
 		/* Remove any old addresses in case they've changed */
 		if (zone->primary)
