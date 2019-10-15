@@ -165,6 +165,10 @@ by Eric Young (eay@cryptsoft.com).
   This applies to DHCPv4 operation only.
   [ISC-Bugs #9]
 
+- Corrected a number of reference counter and zero-length buffer
+  leaks.
+  [ISC-Bugs #57]
+
 		Changes since 4.4.0 (New Features)
 - none
 		Changes since 4.4.0 (Bug Fixes)
