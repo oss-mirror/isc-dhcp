@@ -5373,13 +5373,12 @@ int locate_network (packet)
 					    &global_scope, oc, MDL)) {
 			return 0;
 		}
-		if (data.len == 0) {
-			return 0;
-		}
+
 		if (data.len != 4) {
 			data_string_forget (&data, MDL);
 			return 0;
 		}
+
 		ia.len = 4;
 		memcpy (ia.iabuf, data.data, 4);
 		data_string_forget (&data, MDL);

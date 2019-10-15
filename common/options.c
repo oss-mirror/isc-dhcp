@@ -1406,8 +1406,9 @@ store_options(int *ocount,
 				(option_space_encapsulate
 				 (&encapsulation, packet, lease, client_state,
 				  in_options, cfg_options, scope, &name));
-			data_string_forget (&name, MDL);
 		    }
+
+		    data_string_forget (&name, MDL);
 		}
 	    }
 
@@ -3437,8 +3438,7 @@ int fqdn_option_space_encapsulate (result, packet, lease, client_state,
 	}
       exit:
 	for (i = 1; i <= FQDN_SUBOPTION_COUNT; i++) {
-		if (results [i].len)
-			data_string_forget (&results [i], MDL);
+		data_string_forget (&results[i], MDL);
 	}
 	buffer_dereference (&bp, MDL);
 	if (!status)
@@ -3597,8 +3597,7 @@ fqdn6_option_space_encapsulate(struct data_string *result,
 
       exit:
 	for (i = 1 ; i <= FQDN_SUBOPTION_COUNT ; i++) {
-		if (results[i].len)
-			data_string_forget(&results[i], MDL);
+		data_string_forget(&results[i], MDL);
 	}
 
 	return rval;
@@ -4498,8 +4497,10 @@ void parse_vendor_option(packet, lease, client_state, in_options,
 			      in_options, out_options, scope, oc, MDL);
 
 	/* No name, all done */
-	if (name.len == 0)
+	if (name.len == 0) {
+		data_string_forget(&name, MDL);
 		return;
+	}
 
 	/* Get any vendor option information from the request */
 	oc = lookup_option(&dhcp_universe, in_options, code);
