@@ -416,6 +416,15 @@ ATF_TESTS = $(am__append_1)
 @HAVE_ATF_TRUE@	@BINDLIBDNSDIR@/libdns.@A@ \
 @HAVE_ATF_TRUE@	@BINDLIBISCCFGDIR@/libisccfg.@A@ \
 @HAVE_ATF_TRUE@	@BINDLIBISCDIR@/libisc.@A@
+@HAVE_ATF_TRUE@domain_name_unittest_SOURCES = domain_name_test.c \
+@HAVE_ATF_TRUE@	$(top_srcdir)/tests/t_api_dhcp.c
+
+@HAVE_ATF_TRUE@domain_name_unittest_LDADD = $(ATF_LDFLAGS) \
+@HAVE_ATF_TRUE@	../libdhcp.@A@ ../../omapip/libomapi.@A@ \
+@HAVE_ATF_TRUE@	@BINDLIBIRSDIR@/libirs.@A@ \
+@HAVE_ATF_TRUE@	@BINDLIBDNSDIR@/libdns.@A@ \
+@HAVE_ATF_TRUE@	@BINDLIBISCCFGDIR@/libisccfg.@A@ \
+@HAVE_ATF_TRUE@	@BINDLIBISCDIR@/libisc.@A@
 all: all-recursive
 
 .SUFFIXES:
