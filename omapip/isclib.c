@@ -151,7 +151,7 @@ handle_signal(int sig, void (*handler)(int)) {
  */
 static void
 set_ctx_running(isc_task_t *task, isc_event_t *event) {
-        task = task; // unused;
+    IGNORE_UNUSED(task);
 	dhcp_gbl_ctx.actx_running = ISC_TRUE;
 
 	if (shutdown_signal) {
