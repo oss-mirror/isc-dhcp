@@ -2051,12 +2051,12 @@ void parse_host_declaration (cfile, group)
 			unsigned len;
 
 			skip_token(&val, (unsigned *)0, cfile);
-			data_string_forget (&host -> client_identifier, MDL);
-
 			if (host->client_identifier.len != 0) {
-				parse_warn(cfile, "Host %s already has a "
-						  "client identifier.",
-					   host->name);
+                                parse_warn(cfile,
+					   "Host '%s' already has a uid '%s'",
+                                           host->name,
+					   host->client_identifier.data);
+				skip_to_rbrace(cfile, 1);
 				break;
 			}
 

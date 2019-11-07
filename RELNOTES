@@ -91,7 +91,7 @@ by Eric Young (eay@cryptsoft.com).
 
 - Fixed define flags when using SO_BINDTODEVICE. Thanks to Joe LeVeque for
   reporting the issue.
-  [ISC-Bugs #19]
+  [Gitlab #19]
 
 - A new configuration parameter, ping-cltt-secs (v4 operation only), has
   been added to allow the user to specify the number of seconds that must
@@ -111,7 +111,7 @@ by Eric Young (eay@cryptsoft.com).
 - The KEA Migration Assistant, an experimental tool which helps to
   translate ISC DHCP configurations to Kea, is now included in
   the distribution.
-  (Gitlab #34)
+  [Gitlab #34]
 
 		Changes since 4.4.1 (Bug Fixes)
 
@@ -168,10 +168,10 @@ by Eric Young (eay@cryptsoft.com).
   DHCP service has been restored.  This allows them to be used
   more than once during the lifetime of a dhclient instance. 
   This applies to DHCPv4 operation only.
-  [ISC-Bugs #9]
+  [Gitlab #9]
 
 - Corrected a number of reference counter and zero-length buffer leaks.
-  [ISC-Bugs #57]
+  [Gitlab #57]
 
 - Closed a small window of time between the installation of graceful
   shutdown signal handlers and application context startup, during which
@@ -188,6 +188,11 @@ by Eric Young (eay@cryptsoft.com).
   instead of RFC 1035 wire format. Thanks to Jay Doran at BlueCat Networks
   for reporting this issue.
   [Gitlab #2]
+
+- Improved the error message issued when a host declaration has both
+  a uid and a dhcp-client-identifier. Server configuration parsing will
+  now fail if a host declaration specifies more than one uid.
+  [Gitlab #7]
 
 		Changes since 4.4.0 (New Features)
 - none

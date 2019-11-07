@@ -3,7 +3,7 @@
    Server-specific in-memory database support. */
 
 /*
- * Copyright (c) 2004-2017 by Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (c) 2004-2019 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-2003 by Internet Software Consortium
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
@@ -313,10 +313,21 @@ isc_result_t enter_host (hd, dynamicp, commit)
 	esp = NULL;
 	if (executable_statement_foreach (hd->group->statements,
 					  find_uid_statement, &esp, 0)) {
-		(void) evaluate_option_cache (&hd->client_identifier,
+		struct data_string cid;
+		memset(&cid, 0, sizeof(cid));
+		(void) evaluate_option_cache (&cid,
 					      NULL, NULL, NULL, NULL, NULL, 
 					      &global_scope,
 					      esp->data.option, MDL);
+
+		if (hd->client_identifier.len > 0 && cid.len > 0) {
+			log_error ("Warning, host declaration '%s' already has uid '%s',"
+			           " ignoring dhcp-client-identifier '%s'",
+				   hd->name, hd->client_identifier.data, cid.data);
+			data_string_forget(&cid, MDL);
+		} else {
+			memcpy(&hd->client_identifier, &cid, sizeof(cid));
+		}
 	}
 
 	/* If we got a client identifier, hash this entry by
