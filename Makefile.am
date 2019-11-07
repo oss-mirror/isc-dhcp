@@ -38,7 +38,7 @@ endif
 
 # Use an autoconf substitution vs an automake conditional here
 # to fool automake when the bind directory does not exist.
-SUBDIRS = @BINDSUBDIR@ includes tests common omapip client dhcpctl relay server
+SUBDIRS = @BINDSUBDIR@ includes tests common omapip client dhcpctl relay server dug
 
 nobase_include_HEADERS = dhcpctl/dhcpctl.h
 
