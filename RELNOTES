@@ -173,7 +173,11 @@ by Eric Young (eay@cryptsoft.com).
   the receipt of shutdown signal would cause a REQUIRE() assertion to
   occur.  Note this issue is only visible when compiling with
   ENABLE_GENTLE_SHUTDOWN defined.
-  [Gitlab #53,!18   git TBD]
+  [Gitlab #53]
+
+- Corrected a buffer overflow that can occur when retrieveing zone
+  names that are more than 255 characters in length.
+  [Gitlab #20]
 
 		Changes since 4.4.0 (New Features)
 - none
