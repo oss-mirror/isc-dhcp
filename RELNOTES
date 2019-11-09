@@ -175,9 +175,14 @@ by Eric Young (eay@cryptsoft.com).
   ENABLE_GENTLE_SHUTDOWN defined.
   [Gitlab #53]
 
-- Corrected a buffer overflow that can occur when retrieveing zone
+- Corrected a buffer overflow that can occur when retrieving zone
   names that are more than 255 characters in length.
   [Gitlab #20]
+
+- The "d" domain name option format was incorrectly handled as text
+  instead of RFC 1035 wire format. Thanks to Jay Doran at BlueCat Networks
+  for reporting this issue.
+  [Gitlab #2]
 
 		Changes since 4.4.0 (New Features)
 - none
