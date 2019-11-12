@@ -9,8 +9,9 @@ From time to time the _keama_ is upgraded for bug fixes, support of
 new or not yet ISC DHCP features or more likely support of new KEA
 features.
 
-As now _keama_ is included in ISC DHCP the last code can be find with
-the last ISC DHCP code in the master branch of gitlab repository.
+As now _keama_ is included in ISC DHCP the most recent code can be
+found with the most recent ISC DHCP code in the master branch of the
+gitlab repository.
 
 ## How to build and install
 
