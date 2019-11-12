@@ -463,7 +463,6 @@ options_init(void)
 		default:
 			option->name = def->name;
 		}
-		option->name = def->name;
 		option->format = def->format;
 		option->space = space_lookup(def->space);
 		assert(option->space != NULL);
