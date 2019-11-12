@@ -88,7 +88,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 @HAVE_ATF_TRUE@am__append_1 = alloc_unittest dns_unittest misc_unittest ns_name_unittest \
-@HAVE_ATF_TRUE@	option_unittest
+@HAVE_ATF_TRUE@	option_unittest domain_name_unittest
 
 check_PROGRAMS = $(am__EXEEXT_2)
 subdir = common/tests
@@ -104,7 +104,8 @@ CONFIG_CLEAN_VPATH_FILES =
 @HAVE_ATF_TRUE@am__EXEEXT_1 = alloc_unittest$(EXEEXT) \
 @HAVE_ATF_TRUE@	dns_unittest$(EXEEXT) misc_unittest$(EXEEXT) \
 @HAVE_ATF_TRUE@	ns_name_unittest$(EXEEXT) \
-@HAVE_ATF_TRUE@	option_unittest$(EXEEXT)
+@HAVE_ATF_TRUE@	option_unittest$(EXEEXT) \
+@HAVE_ATF_TRUE@	domain_name_unittest$(EXEEXT)
 am__EXEEXT_2 = $(am__EXEEXT_1)
 am__alloc_unittest_SOURCES_DIST = test_alloc.c \
 	$(top_srcdir)/tests/t_api_dhcp.c
@@ -121,6 +122,14 @@ am__dns_unittest_SOURCES_DIST = dns_unittest.c \
 dns_unittest_OBJECTS = $(am_dns_unittest_OBJECTS)
 @HAVE_ATF_TRUE@dns_unittest_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 @HAVE_ATF_TRUE@	../libdhcp.@A@ ../../omapip/libomapi.@A@
+am__domain_name_unittest_SOURCES_DIST = domain_name_test.c \
+	$(top_srcdir)/tests/t_api_dhcp.c
+@HAVE_ATF_TRUE@am_domain_name_unittest_OBJECTS =  \
+@HAVE_ATF_TRUE@	domain_name_test.$(OBJEXT) t_api_dhcp.$(OBJEXT)
+domain_name_unittest_OBJECTS = $(am_domain_name_unittest_OBJECTS)
+@HAVE_ATF_TRUE@domain_name_unittest_DEPENDENCIES =  \
+@HAVE_ATF_TRUE@	$(am__DEPENDENCIES_1) ../libdhcp.@A@ \
+@HAVE_ATF_TRUE@	../../omapip/libomapi.@A@
 am__misc_unittest_SOURCES_DIST = misc_unittest.c \
 	$(top_srcdir)/tests/t_api_dhcp.c
 @HAVE_ATF_TRUE@am_misc_unittest_OBJECTS = misc_unittest.$(OBJEXT) \
@@ -158,9 +167,9 @@ DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)/includes
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/dns_unittest.Po \
-	./$(DEPDIR)/misc_unittest.Po ./$(DEPDIR)/ns_name_test.Po \
-	./$(DEPDIR)/option_unittest.Po ./$(DEPDIR)/t_api_dhcp.Po \
-	./$(DEPDIR)/test_alloc.Po
+	./$(DEPDIR)/domain_name_test.Po ./$(DEPDIR)/misc_unittest.Po \
+	./$(DEPDIR)/ns_name_test.Po ./$(DEPDIR)/option_unittest.Po \
+	./$(DEPDIR)/t_api_dhcp.Po ./$(DEPDIR)/test_alloc.Po
 am__mv = mv -f
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -179,10 +188,11 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(alloc_unittest_SOURCES) $(dns_unittest_SOURCES) \
-	$(misc_unittest_SOURCES) $(ns_name_unittest_SOURCES) \
-	$(option_unittest_SOURCES)
+	$(domain_name_unittest_SOURCES) $(misc_unittest_SOURCES) \
+	$(ns_name_unittest_SOURCES) $(option_unittest_SOURCES)
 DIST_SOURCES = $(am__alloc_unittest_SOURCES_DIST) \
 	$(am__dns_unittest_SOURCES_DIST) \
+	$(am__domain_name_unittest_SOURCES_DIST) \
 	$(am__misc_unittest_SOURCES_DIST) \
 	$(am__ns_name_unittest_SOURCES_DIST) \
 	$(am__option_unittest_SOURCES_DIST)
@@ -470,6 +480,10 @@ dns_unittest$(EXEEXT): $(dns_unittest_OBJECTS) $(dns_unittest_DEPENDENCIES) $(EX
 	@rm -f dns_unittest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(dns_unittest_OBJECTS) $(dns_unittest_LDADD) $(LIBS)
 
+domain_name_unittest$(EXEEXT): $(domain_name_unittest_OBJECTS) $(domain_name_unittest_DEPENDENCIES) $(EXTRA_domain_name_unittest_DEPENDENCIES) 
+	@rm -f domain_name_unittest$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(domain_name_unittest_OBJECTS) $(domain_name_unittest_LDADD) $(LIBS)
+
 misc_unittest$(EXEEXT): $(misc_unittest_OBJECTS) $(misc_unittest_DEPENDENCIES) $(EXTRA_misc_unittest_DEPENDENCIES) 
 	@rm -f misc_unittest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(misc_unittest_OBJECTS) $(misc_unittest_LDADD) $(LIBS)
@@ -489,6 +503,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dns_unittest.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/domain_name_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/misc_unittest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ns_name_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/option_unittest.Po@am__quote@ # am--include-marker
@@ -729,6 +744,7 @@ clean-am: clean-checkPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-recursive
 		-rm -f ./$(DEPDIR)/dns_unittest.Po
+	-rm -f ./$(DEPDIR)/domain_name_test.Po
 	-rm -f ./$(DEPDIR)/misc_unittest.Po
 	-rm -f ./$(DEPDIR)/ns_name_test.Po
 	-rm -f ./$(DEPDIR)/option_unittest.Po
@@ -780,6 +796,7 @@ installcheck-am:
 
 maintainer-clean: maintainer-clean-recursive
 		-rm -f ./$(DEPDIR)/dns_unittest.Po
+	-rm -f ./$(DEPDIR)/domain_name_test.Po
 	-rm -f ./$(DEPDIR)/misc_unittest.Po
 	-rm -f ./$(DEPDIR)/ns_name_test.Po
 	-rm -f ./$(DEPDIR)/option_unittest.Po
