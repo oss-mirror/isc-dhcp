@@ -7549,7 +7549,7 @@ $as_echo "#define FLEXIBLE_ARRAY_MEMBER /**/" >>confdefs.h
   fi
 
 
-ac_config_files="$ac_config_files Makefile client/Makefile client/tests/Makefile common/Makefile.am common/Makefile common/tests/Makefile dhcpctl/Makefile.am dhcpctl/Makefile includes/Makefile omapip/Makefile.am omapip/Makefile relay/Makefile server/Makefile tests/Makefile.am tests/Makefile tests/unittest.sh server/tests/Makefile doc/devel/doxyfile"
+ac_config_files="$ac_config_files Makefile client/Makefile client/tests/Makefile common/Makefile.am common/Makefile common/tests/Makefile dhcpctl/Makefile.am dhcpctl/Makefile includes/Makefile keama/Makefile omapip/Makefile.am omapip/Makefile relay/Makefile server/Makefile tests/Makefile.am tests/Makefile tests/unittest.sh server/tests/Makefile doc/devel/doxyfile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -8309,6 +8309,7 @@ do
     "dhcpctl/Makefile.am") CONFIG_FILES="$CONFIG_FILES dhcpctl/Makefile.am" ;;
     "dhcpctl/Makefile") CONFIG_FILES="$CONFIG_FILES dhcpctl/Makefile" ;;
     "includes/Makefile") CONFIG_FILES="$CONFIG_FILES includes/Makefile" ;;
+    "keama/Makefile") CONFIG_FILES="$CONFIG_FILES keama/Makefile" ;;
     "omapip/Makefile.am") CONFIG_FILES="$CONFIG_FILES omapip/Makefile.am" ;;
     "omapip/Makefile") CONFIG_FILES="$CONFIG_FILES omapip/Makefile" ;;
     "relay/Makefile") CONFIG_FILES="$CONFIG_FILES relay/Makefile" ;;
