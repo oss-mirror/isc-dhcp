@@ -628,6 +628,16 @@ AC_CHECK_FUNCS(strlcat)
 # For HP/UX we need -lipv6 for if_nametoindex, perhaps others.
 AC_SEARCH_LIBS(if_nametoindex, [ipv6])
 
+# For some Solaris nanosleep is found by BIND in librt
+have_nanosleep="no"
+AC_CHECK_FUNC(nanosleep, have_nanosleep="yes")
+if test "$have_nanosleep" = "no"; then
+	AC_CHECK_LIB(rt, nanosleep, have_nanosleep="rt")
+fi
+if test "$have_nanosleep" = "rt"; then
+	LIBS="-lrt $LIBS"
+fi
+
 # check for /dev/random (declares HAVE_DEV_RANDOM)
 AC_MSG_CHECKING(for random device)
 AC_ARG_WITH(randomdev,
@@ -998,8 +1008,8 @@ AC_CONFIG_FILES([
   common/tests/Makefile
   dhcpctl/Makefile.am
   dhcpctl/Makefile
-  keama/Makefile
   includes/Makefile
+  keama/Makefile
   omapip/Makefile.am
   omapip/Makefile
   relay/Makefile
