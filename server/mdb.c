@@ -321,9 +321,20 @@ isc_result_t enter_host (hd, dynamicp, commit)
 					      esp->data.option, MDL);
 
 		if (hd->client_identifier.len > 0 && cid.len > 0) {
-			log_error ("Warning, host declaration '%s' already has uid '%s',"
+			char uid_buf[256];
+			char cid_buf[256];
+                        print_hex_or_string(hd->client_identifier.len,
+                                            hd->client_identifier.data,
+                                            sizeof(uid_buf) - 1, uid_buf);
+
+                        print_hex_or_string(cid.len, cid.data,
+                                            sizeof(cid_buf) - 1, cid_buf);
+
+			log_error ("Warning, host declaration '%s'"
+				   " already has uid '%s',"
 			           " ignoring dhcp-client-identifier '%s'",
-				   hd->name, hd->client_identifier.data, cid.data);
+				   hd->name, uid_buf, cid_buf); 
+
 			data_string_forget(&cid, MDL);
 		} else {
 			memcpy(&hd->client_identifier, &cid, sizeof(cid));
