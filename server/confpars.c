@@ -2054,11 +2054,11 @@ void parse_host_declaration (cfile, group)
 			if (host->client_identifier.len != 0) {
 				char buf[256];
 				print_hex_or_string(host->client_identifier.len,
-					           host->client_identifier.data,
-						   sizeof(buf) - 1,buf);
-                                parse_warn(cfile,
+						   host->client_identifier.data,
+						   sizeof(buf) - 1, buf);
+				parse_warn(cfile,
 					   "Host '%s' already has a uid '%s'",
-                                           host->name, buf);
+					   host->name, buf);
 				skip_to_rbrace(cfile, 1);
 				break;
 			}
