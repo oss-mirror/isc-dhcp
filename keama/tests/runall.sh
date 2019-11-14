@@ -5,11 +5,6 @@
 cd "$(dirname "$0")"
 
 echo subdirs:
-for d in fordhcp dhcp3 ws ba gcet jt
-do
-	echo $d
-	/bin/sh $d/run.sh
-done
 /bin/sh samples/runall.sh
 
 echo tests:
