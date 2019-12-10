@@ -220,6 +220,7 @@ int parse_option_buffer (options, buffer, length, universe)
 					log_error("parse_option_buffer: "
 						  "No memory.");
 					buffer_dereference(&bp, MDL);
+					option_dereference(&option, MDL);
 					return 0;
 				}
 				/* Copy old option to new data object. */
@@ -245,6 +246,7 @@ int parse_option_buffer (options, buffer, length, universe)
 					log_error("parse_option_buffer: "
 						  "No memory.");
 					buffer_dereference(&bp, MDL);
+					option_dereference(&option, MDL);
 					return 0;
 				}
 
