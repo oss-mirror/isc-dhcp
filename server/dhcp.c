@@ -4361,6 +4361,7 @@ int locate_network (packet)
 			data_string_forget (&data, MDL);
 			return 0;
 		}
+
 		ia.len = 4;
 		memcpy (ia.iabuf, data.data, 4);
 		data_string_forget (&data, MDL);
