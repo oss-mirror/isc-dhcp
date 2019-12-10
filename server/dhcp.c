@@ -1204,7 +1204,7 @@ void dhcpinform (packet, ms_nulltp)
 					   MDL)) {
 			log_error ("unknown option space %s.", d1.data);
 			option_state_dereference (&options, MDL);
-			if (subnet) { 
+			if (subnet) {
 				subnet_dereference (&subnet, MDL);
 			}
 
