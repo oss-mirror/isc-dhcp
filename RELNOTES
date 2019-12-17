@@ -90,10 +90,10 @@ dhcp-users@lists.isc.org.
 - Corrected a number of reference counter and zero-length buffer leaks.
   [Gitlab #57]
 
-- The option format for the server option omapi-key has been changed
-  from "d" (domain-name) to "t" (text).  This option was inadvertantly 
-  broken when the "d" format content was changed to comply with RFC 1035 
-  wire format (see Gitlab #2).
+- The option format for the server option omapi-key was changed to a
+  format type 'k' (key name); while server options ldap-port and
+  ldap-init-retry were changed to 'L' (unsigend 32-bit integer). These
+  three options were inadvertantly broken when the "d" format content
   [Gitlab #68]
 
 			Changes since 4.1-ESV-R15
