@@ -227,8 +227,8 @@ by Eric Young (eay@cryptsoft.com).
 
 - The option format for the server option omapi-key was changed to a
   format type 'k' (key name); while server options ldap-port and
-  ldap-init-retry were changed to 'L' (unsigend 32-bit integer). These
-  three options were inadvertantly broken when the "d" format content
+  ldap-init-retry were changed to 'L' (unsigned 32-bit integer). These
+  three options were inadvertantly broken when the 'd' format content
   was changed to comply with RFC 1035 wire format (see Gitlab #2).
   [Gitlab #68]
 
