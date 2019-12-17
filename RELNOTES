@@ -225,9 +225,10 @@ by Eric Young (eay@cryptsoft.com).
   values (e.g. next-server).
   [Gitlab #28]
 
-- The option format for the server options omapi-key, ldap-port, and
-  ldap-init-retry, has been changed from "d" (domain-name) to "t" (text).
-  These three options inadvertantly broken when the "d" format content
+- The option format for the server option omapi-key was changed to a
+  format type 'k' (key name); while server options ldap-port and
+  ldap-init-retry were changed to 'L' (unsigend 32-bit integer). These
+  three options were inadvertantly broken when the "d" format content
   was changed to comply with RFC 1035 wire format (see Gitlab #2).
   [Gitlab #68]
 

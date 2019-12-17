@@ -5058,6 +5058,24 @@ int parse_option_token (rv, cfile, fmt, expr, uniform, lookups)
 			POST(freeval);
 		}
 		break;
+
+	      case 'k': /* key name */
+		{
+			char* val = parse_host_name(cfile);
+			if (!val) {
+				parse_warn(cfile, "not a valid key name.");
+				skip_to_semi(cfile);
+				return 0;
+			}
+
+			if (!make_const_data (&t, (const unsigned char *)val,
+				      	      strlen(val), 1, 1, MDL)) {
+				log_fatal ("No memory key name");
+			}
+
+			dfree((char *)val, MDL);
+			break;
+		}
 		
 	      case 'N':
 		f = (*fmt) + 1;
