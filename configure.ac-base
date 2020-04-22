@@ -71,7 +71,7 @@ AC_PROG_RANLIB
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 if test "X$AR" != "X"; then
-	BINDCONFIG="$BINDCONFIG 'AR=$AR'"
+	BINDCONFIG="$BINDCONFIG 'AR=$AR' 'ac_cv_path_AR=$AR'"
 fi
 
 AC_CONFIG_HEADERS([includes/config.h])

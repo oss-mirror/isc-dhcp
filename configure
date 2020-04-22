@@ -5255,7 +5255,7 @@ unknown)
 esac
 
 if test "X$AR" != "X"; then
-	BINDCONFIG="$BINDCONFIG 'AR=$AR'"
+	BINDCONFIG="$BINDCONFIG 'AR=$AR' 'ac_cv_path_AR=$AR'"
 fi
 
 ac_config_headers="$ac_config_headers includes/config.h"
