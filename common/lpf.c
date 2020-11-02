@@ -177,9 +177,15 @@ void if_deregister_send (info)
 extern struct sock_filter dhcp_bpf_filter [];
 extern int dhcp_bpf_filter_len;
 
+extern struct sock_filter dhcp_bpf_pureip_filter [];
+extern int dhcp_bpf_pureip_filter_len;
+
 #if defined(RELAY_PORT)
 extern struct sock_filter dhcp_bpf_relay_filter [];
 extern int dhcp_bpf_relay_filter_len;
+
+extern struct sock_filter dhcp_bpf_pureip_relay_filter [];
+extern int dhcp_bpf_pureip_relay_filter_len;
 #endif
 
 #if defined (HAVE_TR_SUPPORT)
@@ -249,31 +255,52 @@ void if_deregister_receive (info)
 static void lpf_gen_filter_setup (info)
 	struct interface_info *info;
 {
+	int pure_ip = info -> hw_address.hbuf [0] == HTYPE_PUREIP;
 	struct sock_fprog p;
 
 	memset(&p, 0, sizeof(p));
 
-	/* Set up the bpf filter program structure.    This is defined in
-	   bpf.c */
-	p.len = dhcp_bpf_filter_len;
-	p.filter = dhcp_bpf_filter;
+	/* Set up the bpf filter program structure and patch port(s).
+	 *
+	 * This is defined in bpf.c, XXX changes to filter program may
+	 * require changes to the insn number(s) used below! XXX
+	 */
 
-        /* Patch the server port into the LPF  program...
-	   XXX changes to filter program may require changes
-	   to the insn number(s) used below! XXX */
+	if (pure_ip) {
+		p.len = dhcp_bpf_pureip_filter_len;
+		p.filter = dhcp_bpf_pureip_filter;
+
+		/* patch port */
+		dhcp_bpf_pureip_filter [6].k = ntohs (local_port);
+	} else {
+		p.len = dhcp_bpf_filter_len;
+		p.filter = dhcp_bpf_filter;
+
+		/* patch port */
+		dhcp_bpf_filter [8].k = ntohs (local_port);
+	}
+
 #if defined(RELAY_PORT)
-	if (relay_port) {
-		/*
-		 * If user defined relay UDP port, we need to filter
-		 * also on the user UDP port.
-		 */
+	/*
+	 * If user defined relay UDP port, we need to filter
+	 * also on the user UDP port.
+	 */
+	if (relay_port && pure_ip) {
+		p.len = dhcp_bpf_pureip_relay_filter_len;
+		p.filter = dhcp_bpf_pureip_relay_filter;
+
+		/* patch ports */
+		dhcp_bpf_pureip_relay_filter [6].k = ntohs (local_port);
+		dhcp_bpf_pureip_relay_filter [8].k = ntohs (relay_port);
+	} else if (relay_port) {
 		p.len = dhcp_bpf_relay_filter_len;
 		p.filter = dhcp_bpf_relay_filter;
 
+		/* patch ports */
+		dhcp_bpf_relay_filter [8].k = ntohs (local_port);
 		dhcp_bpf_relay_filter [10].k = ntohs (relay_port);
 	}
 #endif
-	dhcp_bpf_filter [8].k = ntohs (local_port);
 
 	if (setsockopt (info -> rfdesc, SOL_SOCKET, SO_ATTACH_FILTER, &p,
 			sizeof p) < 0) {
@@ -563,6 +590,12 @@ get_hw_addr(const char *name, struct hardware *hw) {
 			hw->hbuf[0] = HTYPE_FDDI;
 			memcpy(&hw->hbuf[1], sa->sa_data, 6);
 			break;
+#ifdef ARPHRD_RAWIP
+		case ARPHRD_RAWIP:
+			hw->hlen = 1;
+			hw->hbuf[0] = HTYPE_PUREIP;
+			break;
+#endif
 		default:
 			log_fatal("Unsupported device type %ld for \"%s\"",
 				  (long int)sa->sa_family, name);
