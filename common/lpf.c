@@ -221,6 +221,9 @@ void if_register_receive (info)
 		lpf_tr_filter_setup (info);
 	else
 #endif
+	if (info -> hw_address.hbuf [0] == HTYPE_PUREIP)
+		lpf_pureip_filter_setup (info);
+	else
 		lpf_gen_filter_setup (info);
 
 	if (!quiet_interface_discovery)
@@ -255,50 +258,78 @@ void if_deregister_receive (info)
 static void lpf_gen_filter_setup (info)
 	struct interface_info *info;
 {
-	int pure_ip = info -> hw_address.hbuf [0] == HTYPE_PUREIP;
 	struct sock_fprog p;
 
 	memset(&p, 0, sizeof(p));
 
-	/* Set up the bpf filter program structure and patch port(s).
-	 *
-	 * This is defined in bpf.c, XXX changes to filter program may
-	 * require changes to the insn number(s) used below! XXX
-	 */
+	/* Set up the bpf filter program structure.    This is defined in
+	   bpf.c */
+	p.len = dhcp_bpf_filter_len;
+	p.filter = dhcp_bpf_filter;
 
-	if (pure_ip) {
-		p.len = dhcp_bpf_pureip_filter_len;
-		p.filter = dhcp_bpf_pureip_filter;
+	dhcp_bpf_filter [8].k = ntohs (local_port);
 
-		/* patch port */
-		dhcp_bpf_pureip_filter [6].k = ntohs (local_port);
-	} else {
-		p.len = dhcp_bpf_filter_len;
-		p.filter = dhcp_bpf_filter;
-
-		/* patch port */
-		dhcp_bpf_filter [8].k = ntohs (local_port);
-	}
-
+        /* Patch the server port into the LPF  program...
+	   XXX changes to filter program may require changes
+	   to the insn number(s) used below! XXX */
 #if defined(RELAY_PORT)
-	/*
-	 * If user defined relay UDP port, we need to filter
-	 * also on the user UDP port.
-	 */
-	if (relay_port && pure_ip) {
-		p.len = dhcp_bpf_pureip_relay_filter_len;
-		p.filter = dhcp_bpf_pureip_relay_filter;
-
-		/* patch ports */
-		dhcp_bpf_pureip_relay_filter [6].k = ntohs (local_port);
-		dhcp_bpf_pureip_relay_filter [8].k = ntohs (relay_port);
-	} else if (relay_port) {
+	if (relay_port) {
+		/*
+		 * If user defined relay UDP port, we need to filter
+		 * also on the user UDP port.
+		 */
 		p.len = dhcp_bpf_relay_filter_len;
 		p.filter = dhcp_bpf_relay_filter;
 
-		/* patch ports */
 		dhcp_bpf_relay_filter [8].k = ntohs (local_port);
 		dhcp_bpf_relay_filter [10].k = ntohs (relay_port);
+	}
+#endif
+
+	if (setsockopt (info -> rfdesc, SOL_SOCKET, SO_ATTACH_FILTER, &p,
+			sizeof p) < 0) {
+		if (errno == ENOPROTOOPT || errno == EPROTONOSUPPORT ||
+		    errno == ESOCKTNOSUPPORT || errno == EPFNOSUPPORT ||
+		    errno == EAFNOSUPPORT) {
+			log_error ("socket: %m - make sure");
+			log_error ("CONFIG_PACKET (Packet socket) %s",
+				   "and CONFIG_FILTER");
+			log_error ("(Socket Filtering) are enabled %s",
+				   "in your kernel");
+			log_fatal ("configuration!");
+		}
+		log_fatal ("Can't install packet filter program: %m");
+	}
+}
+
+static void lpf_pureip_gen_filter_setup (info)
+	struct interface_info *info;
+{
+	struct sock_fprog p;
+
+	memset(&p, 0, sizeof(p));
+
+	/* Set up the bpf filter program structure.    This is defined in
+	   bpf.c */
+	p.len = dhcp_bpf_pureip_filter_len;
+	p.filter = dhcp_bpf_pureip_filter;
+
+	dhcp_bpf_pureip_filter [6].k = ntohs (local_port);
+
+        /* Patch the server port into the LPF  program...
+	   XXX changes to filter program may require changes
+	   to the insn number(s) used below! XXX */
+#if defined(RELAY_PORT)
+	if (relay_port) {
+		/*
+		 * If user defined relay UDP port, we need to filter
+		 * also on the user UDP port.
+		 */
+		p.len = dhcp_bpf_pureip_relay_filter_len;
+		p.filter = dhcp_bpf_pureip_relay_filter;
+
+		dhcp_bpf_pureip_relay_filter [6].k = ntohs (local_port);
+		dhcp_bpf_pureip_relay_filter [8].k = ntohs (relay_port);
 	}
 #endif
 

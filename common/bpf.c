@@ -214,13 +214,13 @@ struct bpf_insn dhcp_bpf_pureip_filter [] = {
 
 	/* Make sure it's to the right port... */
 	BPF_STMT (BPF_LD + BPF_H + BPF_IND, 2),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 37, 0, 1),             /* patch */
+	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 67, 0, 1),             /* patch */
 
 	/* If we passed all the tests, ask for the whole packet. */
-	BPF_STMT(BPF_RET+BPF_K, (u_int)-1),
+	BPF_STMT(BPF_RET + BPF_K, (u_int)-1),
 
 	/* Otherwise, drop it. */
-	BPF_STMT(BPF_RET+BPF_K, 0),
+	BPF_STMT(BPF_RET + BPF_K, 0),
 };
 
 int dhcp_bpf_pureip_filter_len =
@@ -278,11 +278,11 @@ struct bpf_insn dhcp_bpf_pureip_relay_filter [] = {
 
 	/* Make sure it's to the right port... */
 	BPF_STMT (BPF_LD + BPF_H + BPF_IND, 16),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 37, 2, 0),             /* patch */
+	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 67, 2, 0),             /* patch */
 
 	/* relay can have an alternative port... */
 	BPF_STMT (BPF_LD + BPF_H + BPF_IND, 16),
-	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 37, 0, 1),             /* patch */
+	BPF_JUMP (BPF_JMP + BPF_JEQ + BPF_K, 67, 0, 1),             /* patch */
 
 	/* If we passed all the tests, ask for the whole packet. */
 	BPF_STMT (BPF_RET + BPF_K, (u_int)-1),
