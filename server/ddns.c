@@ -4,8 +4,7 @@
 
 /*
  *
- * Copyright (c) 2004-2017 by Internet Systems Consortium, Inc. ("ISC")
- * Copyright (c) 2000-2003 by Internet Software Consortium
+ * Copyright (c) 2000-2021 by Internet Systems Consortium, Inc. ("ISC")
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -604,7 +603,8 @@ ddns_updates(struct packet *packet, struct lease *lease, struct lease *old,
 	 */
 
 	if (ddns_cb->flags & DDNS_UPDATE_ADDR) {
-		copy_conflict_flags(&ddns_cb->flags, ddns_conflict_mask);
+		/* Set the conflict behavior mask. */
+		get_conflict_mask(&ddns_cb->flags, scope, options, packet);
 	}
 
 	/*
@@ -2027,8 +2027,14 @@ ddns_removals(struct lease    *lease,
 		goto cleanup;
 	}
 
-	/* Set the conflict detection flags based on global configuration */
-	copy_conflict_flags(&ddns_cb->flags, ddns_conflict_mask);
+	if (add_ddns_cb) {
+		/* Use the same flags we used on the associated add */
+		ddns_cb->flags = add_ddns_cb->flags;
+	}
+	else {
+		/* Set the conflict detection flags based on global configuration */
+		copy_conflict_flags(&ddns_cb->flags, ddns_conflict_mask);
+	}
 
 	/*
 	 * For v4 we flag static leases so we don't try
@@ -2255,24 +2261,28 @@ void copy_conflict_flags(u_int16_t *target,
  * Given an option_state, create a mask of conflict detection flags based
  * on the appropriate configuration parameters within the option state.
  */
-u_int16_t
-get_conflict_mask(struct option_state *options) {
+void
+get_conflict_mask(uint16_t *mask, struct binding_scope **scope,
+		  struct option_state *options, struct packet *packet) {
 
 	int ddns_update_conflict_detection = 1;  /* default on  */
         int ddns_dual_stack_mixed_mode = 0;	 /* default off */
         int ddns_guard_id_must_match = 1;	 /* default on  */
         int ddns_other_guard_is_dynamic = 0;	 /* default off */
 	struct option_cache *oc = NULL;
+	int ignorep = 0;
 
-	u_int16_t mask = 0;
 	oc = lookup_option(&server_universe, options, SV_DDNS_CONFLICT_DETECT);
 	if (oc) {
+		struct option_state *in_options = (packet != NULL ?
+						   packet->options : NULL);
 		ddns_update_conflict_detection =
-		evaluate_boolean_option_cache(NULL, NULL, NULL, NULL, options,
-					      NULL, &global_scope, oc, MDL);
+			evaluate_boolean_option_cache(&ignorep, NULL, NULL,
+						      NULL, in_options, NULL,
+						      scope, oc, MDL);
 	}
 
-	set_flag(&mask, DDNS_CONFLICT_DETECTION,
+	set_flag(mask, DDNS_CONFLICT_DETECTION,
 		 ddns_update_conflict_detection);
 
 	if (!ddns_update_conflict_detection) {
@@ -2280,10 +2290,10 @@ get_conflict_mask(struct option_state *options) {
 		log_info ("DDNS conflict detection: off");
 #endif
 		/* Turn the rest of the conflict related flags off */
-		set_flag(&mask, DDNS_DUAL_STACK_MIXED_MODE, 0);
-		set_flag(&mask, DDNS_GUARD_ID_MUST_MATCH, 0);
-		set_flag(&mask, DDNS_OTHER_GUARD_IS_DYNAMIC, 0);
-		return (mask);
+		set_flag(mask, DDNS_DUAL_STACK_MIXED_MODE, 0);
+		set_flag(mask, DDNS_GUARD_ID_MUST_MATCH, 0);
+		set_flag(mask, DDNS_OTHER_GUARD_IS_DYNAMIC, 0);
+		return;
 	}
 
 	// Get the values
@@ -2312,13 +2322,13 @@ get_conflict_mask(struct option_state *options) {
         }
 
 	// Set the flags
-	set_flag(&mask, DDNS_DUAL_STACK_MIXED_MODE,
+	set_flag(mask, DDNS_DUAL_STACK_MIXED_MODE,
 		 ddns_dual_stack_mixed_mode);
 
-	set_flag(&mask, DDNS_GUARD_ID_MUST_MATCH,
+	set_flag(mask, DDNS_GUARD_ID_MUST_MATCH,
 		 ddns_guard_id_must_match);
 
-	set_flag(&mask, DDNS_OTHER_GUARD_IS_DYNAMIC,
+	set_flag(mask, DDNS_OTHER_GUARD_IS_DYNAMIC,
 		 ddns_other_guard_is_dynamic);
 
 #if defined (DEBUG_DNS_UPDATES)
@@ -2334,7 +2344,7 @@ get_conflict_mask(struct option_state *options) {
 		  ddns_guard_id_must_match,
 		  ddns_other_guard_is_dynamic);
 #endif
-	return (mask);
+	return;
 }
 
 #if defined (DEBUG_DNS_UPDATES)

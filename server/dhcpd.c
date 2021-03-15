@@ -3,8 +3,7 @@
    DHCP Server Daemon. */
 
 /*
- * Copyright (c) 2004-2020 by Internet Systems Consortium, Inc. ("ISC")
- * Copyright (c) 1996-2003 by Internet Software Consortium
+ * Copyright (c) 1996-2021 by Internet Systems Consortium, Inc. ("ISC")
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -204,9 +203,12 @@ static void omapi_listener_start (void *foo)
  */
 static char use_noarg[] = "No argument for command: %s ";
 
+static char patch_string[] = " - patched for gitlab #164";
+
 static void
 usage(const char *sfmt, const char *sarg) {
 	log_info("%s %s", message, PACKAGE_VERSION);
+	log_info(patch_string);
 	log_info(copyright);
 	log_info(arr);
 	log_info(url);
@@ -335,6 +337,8 @@ main(int argc, char **argv) {
 			IGNORE_RET(write(STDERR_FILENO,
 					 PACKAGE_VERSION,
 					 strlen(PACKAGE_VERSION)));
+			IGNORE_RET(write(STDERR_FILENO, "\n", 1));
+			IGNORE_RET(write(STDERR_FILENO, patch_string, strlen(patch_string)));
 			IGNORE_RET(write(STDERR_FILENO, "\n", 1));
 			exit (0);
 		} else if (!strcmp(argv[i], "--help") ||
@@ -612,6 +616,7 @@ main(int argc, char **argv) {
 
 	if (!quiet) {
 		log_info("%s %s", message, PACKAGE_VERSION);
+		log_info(patch_string);
 		log_info (copyright);
 		log_info (arr);
 		log_info (url);
@@ -1304,7 +1309,8 @@ void postconf_initialization (int quiet)
 	/* Set the conflict detection flag mask based on globally
 	 * defined DDNS configuration params.  This mask should be
 	 * to init ddns_cb::flags before for every DDNS transaction. */
-	ddns_conflict_mask = get_conflict_mask(options);
+        ddns_conflict_mask = 0;
+        get_conflict_mask(&ddns_conflict_mask, &global_scope, options, NULL);
 
 #else
 	/* If we don't have support for updates compiled in tell the user */

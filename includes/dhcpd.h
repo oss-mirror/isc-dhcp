@@ -2241,7 +2241,8 @@ int ddns_updates(struct packet *, struct lease *, struct lease *,
 		 struct iasubopt *, struct iasubopt *, struct option_state *);
 isc_result_t ddns_removals(struct lease *, struct iasubopt *,
 			   struct dhcp_ddns_cb *, isc_boolean_t);
-u_int16_t get_conflict_mask(struct option_state *input_options);
+void get_conflict_mask(u_int16_t *mask, struct binding_scope **scope,
+                       struct option_state *options, struct packet *packet);
 #if defined (TRACING)
 void trace_ddns_init(void);
 #endif
